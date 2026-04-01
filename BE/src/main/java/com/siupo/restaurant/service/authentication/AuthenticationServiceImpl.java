@@ -44,7 +44,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new UnauthorizedException(ErrorCode.INVALID_CREDENTIALS);
         }
         LoginResponse response = tokenService.generateAuthResponse(user);
-        response.setUser(userMapper.toDto(user));
+        response.setUser(userMapper.toResponse(user));
         return response;
     }
 

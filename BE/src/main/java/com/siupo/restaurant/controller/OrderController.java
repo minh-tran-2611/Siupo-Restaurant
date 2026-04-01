@@ -1,9 +1,9 @@
 package com.siupo.restaurant.controller;
 
-import com.siupo.restaurant.dto.OrderDTO;
 import com.siupo.restaurant.dto.request.CreateOrderRequest;
 import com.siupo.restaurant.dto.response.ApiResponse;
 import com.siupo.restaurant.dto.response.CreateOrderResponse;
+import com.siupo.restaurant.dto.response.OrderResponse;
 import com.siupo.restaurant.dto.response.OrderReviewsResponse;
 import com.siupo.restaurant.enums.EOrderStatus;
 import com.siupo.restaurant.model.Customer;
@@ -65,20 +65,20 @@ public class OrderController {
 	}
 
 	@GetMapping("/my-orders")
-	public ResponseEntity<ApiResponse<List<OrderDTO>>> getMyOrders(@AuthenticationPrincipal User user) {
+	public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(@AuthenticationPrincipal User user) {
 		if (!(user instanceof Customer)) {
 			return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-					ApiResponse.<List<OrderDTO>>builder()
+					ApiResponse.<List<OrderResponse>>builder()
 							.code("403")
 							.success(false)
 							.message("Access denied: Only customers can view their orders")
 							.build()
 			);
 		}
-		List<OrderDTO> orders = orderService.getOrdersByUser(user);
+		List<OrderResponse> orders = orderService.getOrdersByUser(user);
 
 		return ResponseEntity.ok(
-				ApiResponse.<List<OrderDTO>>builder()
+				ApiResponse.<List<OrderResponse>>builder()
 						.code("200")
 						.success(true)
 						.message("Orders retrieved successfully")
@@ -88,14 +88,14 @@ public class OrderController {
 	}
 
 	@PatchMapping("/{id}/customer-cancel")
-	public ResponseEntity<ApiResponse<OrderDTO>> cancelOrderByCustomer(
+	public ResponseEntity<ApiResponse<OrderResponse>> cancelOrderByCustomer(
 			@AuthenticationPrincipal User user,
 			@PathVariable Long id) {
 
-		OrderDTO response = orderService.cancelOrderByCustomer(id, user);
+		OrderResponse response = orderService.cancelOrderByCustomer(id, user);
 
 		return ResponseEntity.ok(
-				ApiResponse.<OrderDTO>builder()
+				ApiResponse.<OrderResponse>builder()
 						.code("200")
 						.success(true)
 						.message("Hủy đơn hàng thành công")
@@ -125,13 +125,13 @@ public class OrderController {
 
 	@GetMapping("/admin")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<ApiResponse<Page<OrderDTO>>> getAllOrders(
+	public ResponseEntity<ApiResponse<Page<OrderResponse>>> getAllOrders(
 			@RequestParam(required = false) EOrderStatus status,
 			@PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-		Page<OrderDTO> orders = orderService.getAllOrders(pageable, status);
+		Page<OrderResponse> orders = orderService.getAllOrders(pageable, status);
 
 		return ResponseEntity.ok(
-				ApiResponse.<Page<OrderDTO>>builder()
+				ApiResponse.<Page<OrderResponse>>builder()
 						.code("200")
 						.success(true)
 						.message("Lấy danh sách đơn hàng thành công")
@@ -142,11 +142,11 @@ public class OrderController {
 
 	@GetMapping("/admin/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<ApiResponse<OrderDTO>> getOrderDetailById(@PathVariable Long id) {
-		OrderDTO order = orderService.getOrderDetailById(id);
+	public ResponseEntity<ApiResponse<OrderResponse>> getOrderDetailById(@PathVariable Long id) {
+		OrderResponse order = orderService.getOrderDetailById(id);
 
 		return ResponseEntity.ok(
-				ApiResponse.<OrderDTO>builder()
+				ApiResponse.<OrderResponse>builder()
 						.code("200")
 						.success(true)
 						.message("Lấy chi tiết đơn hàng thành công")
@@ -157,14 +157,14 @@ public class OrderController {
 
 	@PatchMapping("/admin/{id}/status")
 	@PreAuthorize("hasAnyRole('ADMIN')")
-	public ResponseEntity<ApiResponse<OrderDTO>> updateOrderStatus(
+	public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
 			@PathVariable Long id,
 			@RequestParam EOrderStatus status) {
 
-		OrderDTO order = orderService.updateOrderStatus(id, status);
+		OrderResponse order = orderService.updateOrderStatus(id, status);
 
 		return ResponseEntity.ok(
-				ApiResponse.<OrderDTO>builder()
+				ApiResponse.<OrderResponse>builder()
 						.code("200")
 						.success(true)
 						.message("Cập nhật trạng thái đơn hàng thành công")

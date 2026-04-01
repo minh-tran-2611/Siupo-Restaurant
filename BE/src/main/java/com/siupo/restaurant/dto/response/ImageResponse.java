@@ -1,4 +1,4 @@
-package com.siupo.restaurant.dto;
+package com.siupo.restaurant.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 @NoArgsConstructor
-public class ImageDTO {
+public class ImageResponse {
     private Long id;
     private String url;
     private String name;

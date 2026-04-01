@@ -1,7 +1,6 @@
 package com.siupo.restaurant.mapper;
 
-import com.siupo.restaurant.dto.ImageDTO;
-import com.siupo.restaurant.dto.UserDTO;
+import com.siupo.restaurant.dto.response.ImageResponse;
 import com.siupo.restaurant.dto.response.UserResponse;
 import com.siupo.restaurant.model.User;
 import lombok.RequiredArgsConstructor;
@@ -12,37 +11,30 @@ import org.springframework.stereotype.Component;
 public class UserMapper {
     private final ImageMapper imageMapper;
 
-    public UserDTO toDto(User user) {
+    public UserResponse toResponse(User user) {
         if (user == null) {
             return null;
         }
-        UserDTO dto = UserDTO.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .phoneNumber(user.getPhoneNumber())
-                .role(getUserRole(user))
-                .build();
+        
+        ImageResponse avatarResponse = null;
         if (user.getAvatar() != null) {
-            dto.setAvatar(ImageDTO.builder()
+            avatarResponse = ImageResponse.builder()
                     .id(user.getAvatar().getId())
                     .url(user.getAvatar().getUrl())
-                    .build());
+                    .name(user.getAvatar().getName())
+                    .build();
         }
-        return dto;
-    }
-
-    public UserResponse toResponse(User user) {
+        
         return UserResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .role(user.getClass().getSimpleName().toUpperCase())
+                .role(getUserRole(user))
                 .dateOfBirth(user.getDateOfBirth())
                 .gender(user.getGender())
                 .status(user.getStatus())
-                .avatar(imageMapper.toDto(user.getAvatar()))
+                .avatar(avatarResponse)
                 .build();
     }
 

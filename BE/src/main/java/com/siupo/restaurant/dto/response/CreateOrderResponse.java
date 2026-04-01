@@ -1,6 +1,5 @@
 package com.siupo.restaurant.dto.response;
 
-import com.siupo.restaurant.dto.OrderItemDTO;
 import com.siupo.restaurant.enums.EOrderStatus;
 import com.siupo.restaurant.enums.EPaymentMethod;
 import lombok.AllArgsConstructor;
@@ -21,7 +20,7 @@ public class CreateOrderResponse {
     private Double shippingFee;
     private Double vat;
     private EPaymentMethod paymentMethod;
-    private List<OrderItemDTO> items;
+    private List<OrderItemResponse> items;
     private String payUrl;
     private String qrCodeUrl;
     private String deeplink;
