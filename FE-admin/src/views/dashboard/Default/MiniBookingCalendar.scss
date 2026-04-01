@@ -1,0 +1,61 @@
+.mini-booking-calendar {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
+
+  /* Ensure MUI calendar components stretch to container width */
+  .MuiPaper-root,
+  .MuiCalendarPicker-root,
+  .MuiPickersCalendar-root,
+  .MuiDayPicker-root,
+  .MuiCalendarPicker-viewTransitionContainer,
+  .MuiPickersBasePicker-container {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .MuiPickersDay-root {
+    position: relative;
+  }
+
+  /* Slide transition wrapper for month switching */
+  .month-slide-wrapper {
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .month-slide-track {
+    display: flex;
+    width: 200%;
+    transition: transform 300ms ease-in-out;
+  }
+
+  display: flex;
+  width: 200%;
+  /* default transition removed - JS will set explicit transition for smoother control */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+
+  .booking-indicator {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .booking-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .booking-count {
+    font-size: 0.65rem;
+    color: rgba(0, 0, 0, 0.6);
+    font-weight: 500;
+  }
+}

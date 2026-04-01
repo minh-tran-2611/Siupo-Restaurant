@@ -1,0 +1,86 @@
+{
+  "hero": {
+    "subtitle": "Our Story & Passion",
+    "title": "About Us",
+    "watchVideo": "Watch Video"
+  },
+  "menu": {
+    "description": "Discover our delicious selection of dishes prepared with the finest ingredients and authentic recipes.",
+    "noDescription": "No description available",
+    "title": "Our Food Menu",
+    "viewMore": "View More Menu"
+  },
+  "mission": {
+    "content": "To provide our guests with exceptional food, warm hospitality, and memorable moments that bring people together.",
+    "title": "Our Mission"
+  },
+  "story": {
+    "content": "Founded with a passion for authentic cuisine and exceptional service, we have been serving our community for over 20 years. Our restaurant combines traditional recipes with modern culinary techniques to create unforgettable dining experiences.",
+    "title": "Our Story"
+  },
+  "team": {
+    "description": "Our talented team of chefs and staff are dedicated to making your dining experience exceptional.",
+    "title": "Meet Our Team"
+  },
+  "testimonials": {
+    "items": [
+      {
+        "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
+        "name": "Aaravh Naehia",
+        "role": "Food Specialist",
+        "text": "The quality of ingredients here is outstanding. Every salad feels fresh and thoughtfully prepared. This has become my go-to place for healthy, delicious meals that actually taste amazing!"
+      },
+      {
+        "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
+        "name": "Emma Larson",
+        "role": "Fitness Coach",
+        "text": "Finally found a restaurant that truly understands healthy eating! The portions are perfect, flavors are spot on, and everything is made with real, fresh ingredients. The quinoa bowls are a must-try!"
+      },
+      {
+        "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
+        "name": "David Kim",
+        "role": "Regular Customer",
+        "text": "I order lunch here 4–5 times a week. The grilled salmon salad is incredible — always fresh, perfectly seasoned, and delivered quickly. Hands down the best healthy food option in town!"
+      }
+    ],
+    "subtitle": "Testimonials",
+    "title": "What our client are saying"
+  },
+  "values": {
+    "authenticity": {
+      "description": "Traditional recipes passed down through generations, prepared with care and expertise.",
+      "title": "Authenticity"
+    },
+    "quality": {
+      "description": "We source the finest ingredients and maintain the highest standards in every dish.",
+      "title": "Quality"
+    },
+    "service": {
+      "description": "Warm, attentive service that makes every guest feel like family.",
+      "title": "Service"
+    },
+    "sustainability": {
+      "description": "Committed to sustainable practices and supporting local suppliers.",
+      "title": "Sustainability"
+    },
+    "title": "Our Values"
+  },
+  "whyChooseUs": {
+    "description": "We pride ourselves on providing you with the best dining experience through a perfect combination of quality, service, and atmosphere.",
+    "features": {
+      "bestChef": {
+        "description": "Our experienced culinary team has years of achievement in the gastronomy field, always creative and passionate about their craft.",
+        "title": "Best Chef"
+      },
+      "cleanEnvironment": {
+        "description": "A clean, comfortable, and safe restaurant space with food hygiene maintained to the highest standards.",
+        "title": "Clean Environment"
+      },
+      "qualityFood": {
+        "description": "A diverse menu with over 120 dishes ranging from traditional to modern cuisine, satisfying every palate.",
+        "title": "120+ Quality Dishes"
+      }
+    },
+    "title": "Why Choose Us"
+  }
+}
