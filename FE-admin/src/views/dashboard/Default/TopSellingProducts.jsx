@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import MainCard from 'ui-component/cards/MainCard';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -6,72 +6,28 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import orderApi from '../../../api/orderApi';
+import analyticsApi from '../../../api/analyticsApi';
 
 // Component hiển thị top món bán chạy
 export default function TopSellingProducts() {
-  const [orders, setOrders] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchTopProducts = async () => {
       try {
-        const res = await orderApi.getOrders({ page: 0, size: 5000 });
-        const fetchedOrders = (res && res.content) || (res && res.data && res.data.content) || [];
-        setOrders(fetchedOrders);
+        const res = await analyticsApi.getTopProducts(5, 'THIS_MONTH');
+        if (res && res.data && Array.isArray(res.data)) {
+          setTopProducts(res.data);
+        }
       } catch (err) {
-        console.error('Error fetching orders for top selling products:', err);
+        console.error('Error fetching top selling products:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchOrders();
+    fetchTopProducts();
   }, []);
-
-  const topProducts = useMemo(() => {
-    // Aggregate product data from all completed orders
-    const productMap = {};
-
-    orders.forEach((order) => {
-      // Only count completed orders
-      if (String(order.status).toUpperCase() !== 'COMPLETED') return;
-
-      // Check if order has items
-      if (!order.items || !Array.isArray(order.items)) return;
-
-      order.items.forEach((item) => {
-        const productId = item.productId || item.id;
-        const productName = item.productName || item.name || 'Unknown Product';
-        const imageUrl = item.productImageUrl || item.imageUrl || '';
-        const price = item.price || 0;
-        const quantity = item.quantity || 0;
-
-        if (!productId) return;
-
-        if (!productMap[productId]) {
-          productMap[productId] = {
-            id: productId,
-            name: productName,
-            imageUrl: imageUrl,
-            totalQuantity: 0,
-            totalRevenue: 0,
-            orderCount: 0
-          };
-        }
-
-        productMap[productId].totalQuantity += quantity;
-        productMap[productId].totalRevenue += price * quantity;
-        productMap[productId].orderCount += 1;
-      });
-    });
-
-    // Convert to array and sort by quantity (or revenue)
-    const productsArray = Object.values(productMap);
-    productsArray.sort((a, b) => b.totalQuantity - a.totalQuantity);
-
-    // Return top 10
-    return productsArray.slice(0, 10);
-  }, [orders]);
 
   if (loading) {
     return (
@@ -81,7 +37,7 @@ export default function TopSellingProducts() {
     );
   }
 
-  if (topProducts.length === 0) {
+  if (!topProducts || topProducts.length === 0) {
     return (
       <MainCard>
         <Typography variant="h4" sx={{ mb: 2 }}>
@@ -102,7 +58,7 @@ export default function TopSellingProducts() {
       <Stack spacing={2}>
         {topProducts.map((product, index) => (
           <Stack
-            key={product.id}
+            key={product.productId}
             direction="row"
             spacing={2}
             alignItems="center"
@@ -152,15 +108,15 @@ export default function TopSellingProducts() {
             {/* Product Info */}
             <Box flex={1} minWidth={0}>
               <Typography variant="subtitle1" fontWeight={600} noWrap>
-                {product.name}
+                {product.productName}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
                 <Typography variant="caption" color="text.secondary">
-                  {product.orderCount} orders
+                  Sold: {product.quantitySold}
                 </Typography>
                 <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'divider' }} />
                 <Typography variant="caption" color="primary.main" fontWeight={600}>
-                  ${(product.totalRevenue / 25000).toFixed(2)}
+                  ${(product.revenue / 25000).toFixed(2)}
                 </Typography>
               </Stack>
             </Box>
@@ -168,7 +124,7 @@ export default function TopSellingProducts() {
             {/* Quantity Sold */}
             <Box sx={{ textAlign: 'right' }}>
               <Chip
-                label={`${product.totalQuantity} sold`}
+                label={`${product.quantitySold} sold`}
                 color={index < 3 ? 'primary' : 'default'}
                 size="small"
                 sx={{ fontWeight: 600 }}
