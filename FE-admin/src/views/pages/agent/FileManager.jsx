@@ -7,6 +7,9 @@ import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import { useTheme, alpha } from '@mui/material/styles';
 
+// design tokens — same source as palette.jsx
+import C from 'assets/scss/_themes-vars.module.scss';
+
 // icons
 import {
   IconFile,
@@ -23,10 +26,10 @@ import {
 // ==============================|| FILE MANAGER ||============================== //
 
 const FILE_TYPES = {
-  document: { icon: IconFileText, color: '#00897b', label: 'Document' },
-  image: { icon: IconPhoto, color: '#ff9f0d', label: 'Image' },
-  data: { icon: IconDatabase, color: '#4db6ac', label: 'Data' },
-  other: { icon: IconFile, color: '#697586', label: 'File' }
+  document: { icon: IconFileText, color: C.primaryMain, label: 'Document' },
+  image: { icon: IconPhoto, color: C.secondaryMain, label: 'Image' },
+  data: { icon: IconDatabase, color: C.primary200, label: 'Data' },
+  other: { icon: IconFile, color: C.grey500, label: 'File' }
 };
 
 const MOCK_FILES = [
@@ -199,8 +202,8 @@ function FileItem({ file }) {
               sx={{
                 height: 16,
                 fontSize: '0.58rem',
-                bgcolor: file.source === 'agent' ? alpha('#ff9f0d', 0.1) : alpha('#4db6ac', 0.12),
-                color: file.source === 'agent' ? '#d68000' : '#00695c',
+                bgcolor: file.source === 'agent' ? alpha(C.secondaryMain, 0.1) : alpha(C.primary200, 0.12),
+                color: file.source === 'agent' ? C.secondaryDark : C.primaryDark,
                 '& .MuiChip-label': { px: 0.75 }
               }}
             />

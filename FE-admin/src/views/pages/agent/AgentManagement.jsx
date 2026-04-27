@@ -14,6 +14,9 @@ import TaskPipeline from './TaskPipeline';
 import FileManager from './FileManager';
 import { gridSpacing } from 'store/constant';
 
+// design tokens — same source as palette.jsx
+import C from 'assets/scss/_themes-vars.module.scss';
+
 // icons
 import {
   IconRobot,
@@ -104,7 +107,7 @@ function AgentHeroCard() {
               fontSize: '0.72rem',
               height: 26,
               backdropFilter: 'blur(4px)',
-              '& .MuiChip-icon': { color: '#69f0ae' }
+              '& .MuiChip-icon': { color: C.success200 }
             }}
           />
         </Box>

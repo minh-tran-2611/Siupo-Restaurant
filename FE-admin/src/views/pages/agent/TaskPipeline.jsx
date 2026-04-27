@@ -7,10 +7,22 @@ import Fade from '@mui/material/Fade';
 import IconButton from '@mui/material/IconButton';
 import { useTheme, alpha } from '@mui/material/styles';
 
+// design tokens — same source as palette.jsx
+import C from 'assets/scss/_themes-vars.module.scss';
+
 // icons
 import { IconChevronRight, IconClock, IconCheck, IconX, IconLoader2 } from '@tabler/icons-react';
 
 // ==============================|| TASK PIPELINE ||============================== //
+
+// ── Agent color mapping (resolved from theme tokens) ──────────────────────────
+const AGENT_COLOR = {
+  analytics:   C.secondaryMain,
+  management:  C.primaryMain,
+  consolidate: C.secondary200,
+  ingest:      C.grey600,
+  orchestrator: C.primaryMain,
+};
 
 const MOCK_TASKS = [
   {
@@ -18,7 +30,6 @@ const MOCK_TASKS = [
     title: 'Phân tích doanh thu tháng 4',
     agent: 'analytics',
     agentIcon: '📊',
-    agentColor: '#ff9f0d',
     status: 'completed',
     timestamp: '14:21',
     duration: '2.1s',
@@ -31,7 +42,6 @@ const MOCK_TASKS = [
     title: 'Thêm sản phẩm Bún Bò Huế giá 55.000đ',
     agent: 'management',
     agentIcon: '⚙️',
-    agentColor: '#00897b',
     status: 'completed',
     timestamp: '14:18',
     duration: '1.4s',
@@ -44,7 +54,6 @@ const MOCK_TASKS = [
     title: 'Tìm kiếm khách hàng VIP',
     agent: 'management',
     agentIcon: '⚙️',
-    agentColor: '#00897b',
     status: 'completed',
     timestamp: '14:15',
     duration: '0.9s',
@@ -57,7 +66,6 @@ const MOCK_TASKS = [
     title: 'Cập nhật banner trang chủ',
     agent: 'management',
     agentIcon: '⚙️',
-    agentColor: '#00897b',
     status: 'failed',
     timestamp: '14:10',
     duration: '3.2s',
@@ -70,7 +78,6 @@ const MOCK_TASKS = [
     title: 'Tạo voucher giảm 20% dịp lễ',
     agent: 'management',
     agentIcon: '⚙️',
-    agentColor: '#00897b',
     status: 'completed',
     timestamp: '13:55',
     duration: '1.8s',
@@ -83,7 +90,6 @@ const MOCK_TASKS = [
     title: 'Thống kê đơn hàng bị hủy tuần này',
     agent: 'analytics',
     agentIcon: '📊',
-    agentColor: '#ff9f0d',
     status: 'completed',
     timestamp: '13:40',
     duration: '2.8s',
@@ -96,7 +102,6 @@ const MOCK_TASKS = [
     title: 'Memory consolidation hàng ngày',
     agent: 'consolidate',
     agentIcon: '🔄',
-    agentColor: '#ffb84d',
     status: 'completed',
     timestamp: '03:00',
     duration: '4.5s',
@@ -109,7 +114,6 @@ const MOCK_TASKS = [
     title: 'Báo cáo hiệu suất sản phẩm',
     agent: 'analytics',
     agentIcon: '📊',
-    agentColor: '#ff9f0d',
     status: 'processing',
     timestamp: '14:22',
     duration: '...',
@@ -120,15 +124,16 @@ const MOCK_TASKS = [
 ];
 
 const statusConfig = {
-  completed: { color: '#00c853', bg: '#e8f5e9', icon: IconCheck, label: 'Hoàn thành' },
-  failed: { color: '#f44336', bg: '#ffebee', icon: IconX, label: 'Thất bại' },
-  processing: { color: '#ff9f0d', bg: '#fff5e6', icon: IconLoader2, label: 'Đang xử lý' }
+  completed: { color: C.successDark, bg: C.successLight, icon: IconCheck, label: 'Hoàn thành' },
+  failed: { color: C.errorMain, bg: C.errorLight, icon: IconX, label: 'Thất bại' },
+  processing: { color: C.secondaryMain, bg: C.secondaryLight, icon: IconLoader2, label: 'Đang xử lý' }
 };
 
 function TaskItem({ task, isExpanded, onToggle }) {
   const theme = useTheme();
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
+  const agentColor = AGENT_COLOR[task.agent] || C.grey500;
 
   return (
     <Box
@@ -138,11 +143,11 @@ function TaskItem({ task, isExpanded, onToggle }) {
         borderRadius: 2,
         cursor: 'pointer',
         border: `1px solid ${alpha(theme.palette.grey[200], 0.8)}`,
-        bgcolor: isExpanded ? alpha(task.agentColor, 0.03) : 'transparent',
+        bgcolor: isExpanded ? alpha(agentColor, 0.03) : 'transparent',
         transition: 'all 0.2s ease',
         '&:hover': {
-          bgcolor: alpha(task.agentColor, 0.05),
-          borderColor: alpha(task.agentColor, 0.3),
+          bgcolor: alpha(agentColor, 0.05),
+          borderColor: alpha(agentColor, 0.3),
           transform: 'translateX(4px)'
         }
       }}
@@ -158,7 +163,7 @@ function TaskItem({ task, isExpanded, onToggle }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: alpha(task.agentColor, 0.1),
+            bgcolor: alpha(agentColor, 0.1),
             fontSize: '16px',
             flexShrink: 0
           }}
@@ -229,8 +234,8 @@ function TaskItem({ task, isExpanded, onToggle }) {
                   sx={{
                     height: 20,
                     fontSize: '0.6rem',
-                    bgcolor: alpha(task.agentColor, 0.08),
-                    color: task.agentColor,
+                    bgcolor: alpha(agentColor, 0.08),
+                    color: agentColor,
                     fontFamily: 'monospace'
                   }}
                 />
@@ -245,9 +250,9 @@ function TaskItem({ task, isExpanded, onToggle }) {
               <Box
                 sx={{
                   bgcolor: task.status === 'failed'
-                    ? alpha('#f44336', 0.06)
-                    : alpha(task.agentColor, 0.05),
-                  border: `1px solid ${task.status === 'failed' ? alpha('#f44336', 0.18) : alpha(task.agentColor, 0.15)}`,
+                    ? alpha(C.errorMain, 0.06)
+                    : alpha(agentColor, 0.05),
+                  border: `1px solid ${task.status === 'failed' ? alpha(C.errorMain, 0.18) : alpha(agentColor, 0.15)}`,
                   borderRadius: 1.5,
                   p: 1,
                   mt: 0.5
@@ -257,7 +262,7 @@ function TaskItem({ task, isExpanded, onToggle }) {
                   variant="caption"
                   sx={{
                     display: 'block',
-                    color: task.status === 'failed' ? '#c62828' : theme.palette.grey[600],
+                    color: task.status === 'failed' ? C.errorDark : theme.palette.grey[600],
                     lineHeight: 1.6,
                     fontSize: '0.72rem'
                   }}

@@ -11,8 +11,14 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import CircularProgress from '@mui/material/CircularProgress';
+import InputAdornment from '@mui/material/InputAdornment';
 import { useTheme, alpha } from '@mui/material/styles';
-import { IconX, IconSettings } from '@tabler/icons-react';
+import { IconX, IconSettings, IconEye, IconEyeOff, IconCheck, IconAlertCircle } from '@tabler/icons-react';
 
 // design tokens — same source as palette.jsx
 import C from 'assets/scss/_themes-vars.module.scss';
@@ -26,13 +32,78 @@ const STATUS_COLOR = {
 };
 const STATUS_LABEL = { online: 'Running', task: 'Processing', idle: 'Idle', error: 'Error' };
 
+// ── LLM provider catalog ──────────────────────────────────────────────────────
+//  detectProvider() inspects the API key prefix; falls back to dropdown if unknown.
+//  Order matters: 'sk-ant-' must be checked BEFORE 'sk-' (OpenAI's prefix).
+const PROVIDERS = [
+  { id: 'anthropic', name: 'Anthropic',     prefixes: ['sk-ant-'],            color: '#d97757' },
+  { id: 'openai',    name: 'OpenAI',        prefixes: ['sk-proj-', 'sk-'],    color: '#10a37f' },
+  { id: 'google',    name: 'Google Gemini', prefixes: ['AIza'],               color: '#4285f4' },
+  { id: 'xai',       name: 'xAI (Grok)',    prefixes: ['xai-'],               color: '#000000' },
+];
+
+// Mock model catalog. TODO: replace with BE proxy `GET /api/agents/models?provider=...`
+// once backend is ready — calling provider APIs directly from browser exposes the key
+// and runs into CORS for OpenAI/Anthropic.
+const MOCK_MODELS = {
+  anthropic: [
+    { id: 'claude-opus-4-7',           label: 'Claude Opus 4.7',     note: 'Most intelligent' },
+    { id: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6',   note: 'Balanced'         },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',    note: 'Fastest'          },
+    { id: 'claude-sonnet-4-5',         label: 'Claude Sonnet 4.5',   note: ''                 },
+    { id: 'claude-haiku-3-5',          label: 'Claude Haiku 3.5',    note: ''                 },
+  ],
+  openai: [
+    { id: 'gpt-4o',         label: 'GPT-4o',          note: 'Most capable' },
+    { id: 'gpt-4o-mini',    label: 'GPT-4o mini',     note: 'Fast & cheap' },
+    { id: 'gpt-4-turbo',    label: 'GPT-4 Turbo',     note: ''             },
+    { id: 'o1-preview',     label: 'o1 Preview',      note: 'Reasoning'    },
+    { id: 'o1-mini',        label: 'o1 mini',         note: ''             },
+  ],
+  google: [
+    { id: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro',        note: ''            },
+    { id: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash',      note: 'Recommended' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', note: ''            },
+    { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash',      note: ''            },
+    { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro',        note: ''            },
+  ],
+  xai: [
+    { id: 'grok-2',      label: 'Grok 2',      note: '' },
+    { id: 'grok-2-mini', label: 'Grok 2 mini', note: '' },
+    { id: 'grok-beta',   label: 'Grok Beta',   note: '' },
+  ],
+};
+
+function detectProvider(apiKey) {
+  if (!apiKey || apiKey.length < 4) return null;
+  for (const p of PROVIDERS) {
+    if (p.prefixes.some((prefix) => apiKey.startsWith(prefix))) return p.id;
+  }
+  return null;
+}
+
+function inferProviderFromModel(model) {
+  if (!model) return null;
+  if (model.startsWith('claude')) return 'anthropic';
+  if (model.startsWith('gemini')) return 'google';
+  if (model.startsWith('gpt') || model.startsWith('o1')) return 'openai';
+  if (model.startsWith('grok')) return 'xai';
+  return null;
+}
+
+// Load model list for a provider. Mocked with 320ms delay; swap to BE call later.
+async function loadModelsFromKey(provider /* , apiKey */) {
+  await new Promise((r) => setTimeout(r, 320));
+  return MOCK_MODELS[provider] || [];
+}
+
 // ── Agent nodes ───────────────────────────────────────────────────────────────
 const AGENTS = [
   {
     id: 'orchestrator', name: 'Orchestrator',
     role: 'Router & Intent Classifier',
     gradient: [C.primaryMain, C.primary800],
-    x: 550, y: 235, status: 'online',
+    x: 700, y: 235, status: 'online',
     description: 'Router chính — nhận request, phân loại intent, delegate sang Analytics hoặc Management. Hỗ trợ RAG search và internet search.',
     capabilities: [
       'Phân loại intent từ user message',
@@ -41,7 +112,7 @@ const AGENTS = [
       'Web search qua Google',
       'Quản lý conversation memory',
     ],
-    config: { model: 'gemini-2.5-flash', temperature: 0.7, maxIter: 5, timeout: '30s', retry: 2 },
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 4,
     stats: { callsToday: 142, avgLatency: '1.4s', successRate: '94%' },
   },
@@ -49,7 +120,7 @@ const AGENTS = [
     id: 'analytics', name: 'Analytics',
     role: 'Business Intelligence',
     gradient: [C.secondaryMain, C.secondaryDark],
-    x: 215, y: 435, status: 'online',
+    x: 274, y: 435, status: 'online',
     description: 'Phân tích dữ liệu kinh doanh: doanh thu, đơn hàng, sản phẩm, khách hàng, đặt bàn, AI insights.',
     capabilities: [
       'Báo cáo doanh thu theo period',
@@ -57,7 +128,7 @@ const AGENTS = [
       'Customer segmentation & VIP',
       'AI insights & recommendations',
     ],
-    config: { model: 'gemini-2.5-flash', temperature: 0.3, maxIter: 8, timeout: '45s', retry: 1 },
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 20,
     stats: { callsToday: 38, avgLatency: '2.6s', successRate: '97%' },
   },
@@ -65,7 +136,7 @@ const AGENTS = [
     id: 'management', name: 'Management',
     role: 'CRUD Operations',
     gradient: [C.primary200, C.primaryDark],
-    x: 885, y: 435, status: 'task',
+    x: 1126, y: 435, status: 'task',
     description: 'CRUD toàn bộ dữ liệu nhà hàng: sản phẩm, danh mục, combo, banner, thông báo, đơn hàng, voucher, người dùng, tag.',
     capabilities: [
       'CRUD Products / Combos / Categories',
@@ -73,7 +144,7 @@ const AGENTS = [
       'Voucher & Banner management',
       'User & Notification handling',
     ],
-    config: { model: 'gemini-2.5-flash', temperature: 0.3, maxIter: 10, timeout: '45s', retry: 2 },
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 47,
     stats: { callsToday: 76, avgLatency: '1.8s', successRate: '91%' },
   },
@@ -81,14 +152,14 @@ const AGENTS = [
     id: 'ingest', name: 'Ingest',
     role: 'Memory Classifier',
     gradient: [C.grey600, C.grey900],
-    x: 252, y: 638, status: 'online',
+    x: 321, y: 638, status: 'online',
     description: 'Phân loại và lưu memory sau mỗi hội thoại. Tier: CORE → IMPORTANT → DETAIL → NOISE.',
     capabilities: [
       'Phân tier memory (CORE/IMPORTANT/DETAIL/NOISE)',
       'Trích xuất entities & topics',
       'Lưu memory vào Turso',
     ],
-    config: { model: 'gemini-2.5-flash', temperature: 0.1, maxIter: '—', timeout: '20s', retry: 1 },
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 0,
     stats: { callsToday: 142, avgLatency: '0.7s', successRate: '99%' },
   },
@@ -96,14 +167,14 @@ const AGENTS = [
     id: 'consolidate', name: 'Consolidate',
     role: 'Memory Compactor',
     gradient: [C.secondary200, C.secondary800],
-    x: 848, y: 638, status: 'idle',
+    x: 1079, y: 638, status: 'idle',
     description: 'Gộp raw memories thành consolidated summaries, xóa duplicates, giữ entities quan trọng. Trigger: APScheduler mỗi 24h.',
     capabilities: [
       'Gộp raw memories → summaries',
       'Khử trùng lặp entities',
       'Trigger định kỳ qua APScheduler',
     ],
-    config: { model: 'gemini-2.5-flash', temperature: 0.1, maxIter: '—', timeout: '120s', retry: 1 },
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 0,
     stats: { callsToday: 1, avgLatency: '4.5s', successRate: '100%' },
   },
@@ -115,7 +186,7 @@ const TOOL_BUNDLES = [
     id: 'tools_analytics', parentId: 'analytics', name: 'Analytics Tools', countLabel: '20 tools',
     role: 'Tool registry của Analytics agent',
     description: 'Tập hợp 20 tools mà Analytics agent có thể gọi để truy vấn BE /api/analytics/* và shared read endpoints.',
-    x: 50, y: 530, r: 34,
+    x: 64, y: 530, r: 34,
     gradient: [C.secondaryMain, C.secondaryDark],
     toolGroups: [
       { label: 'Analytics API', tools: ['Summary', 'Revenue', 'Orders', 'Products', 'Customers', 'Booking', 'Insights'] },
@@ -126,7 +197,7 @@ const TOOL_BUNDLES = [
     id: 'tools_management', parentId: 'management', name: 'Management Tools', countLabel: '47 tools',
     role: 'Tool registry của Management agent',
     description: 'Tập hợp 47 CRUD tools cho banner, category, combo, product, order, voucher, tag, user, notification.',
-    x: 1050, y: 530, r: 34,
+    x: 1336, y: 530, r: 34,
     gradient: [C.primary200, C.primaryDark],
     toolGroups: [
       { label: 'Banner',   tools: ['GetAll', 'GetById', 'Create', 'Update', 'Delete'] },
@@ -154,7 +225,7 @@ const INFRA = [
       topK: 5,
       scoreThreshold: 0.7,
     },
-    x: 148, y: 278, r: 28, grad: [C.grey600, C.grey900], icon: 'qdrant', shared: true,
+    x: 188, y: 278, r: 28, grad: [C.grey600, C.grey900], icon: 'qdrant', shared: true,
   },
   {
     id: 'google', name: 'Google Search', sub: 'Search API',
@@ -167,7 +238,7 @@ const INFRA = [
       language: 'vi',
       safeSearch: 'moderate',
     },
-    x: 952, y: 278, r: 28, grad: [C.grey600, C.grey900], icon: 'google', shared: true,
+    x: 1212, y: 278, r: 28, grad: [C.grey600, C.grey900], icon: 'google', shared: true,
   },
   {
     id: 'turso', name: 'Memory Store', sub: 'Turso / libSQL',
@@ -179,16 +250,16 @@ const INFRA = [
       ttlDays: 30,
       maxMemoriesPerUser: 1000,
     },
-    x: 550, y: 705, r: 28, grad: [C.grey700, C.grey900], icon: 'db', shared: false,
+    x: 700, y: 705, r: 28, grad: [C.grey700, C.grey900], icon: 'db', shared: false,
   },
 ];
 
 const CHANNELS = [
-  { id: 'zalo',  name: 'Zalo',  x: 370, y: 58, r: 22, color: '#00B14F' },
-  { id: 'gmail', name: 'Gmail', x: 730, y: 58, r: 22, color: '#EA4335' },
+  { id: 'zalo',  name: 'Zalo',  x: 471, y: 58, r: 22, color: '#00B14F' },
+  { id: 'gmail', name: 'Gmail', x: 929, y: 58, r: 22, color: '#EA4335' },
 ];
 
-const SCHEDULER_NODE = { id: 'scheduler', x: 994, y: 612, r: 19 };
+const SCHEDULER_NODE = { id: 'scheduler', x: 1265, y: 612, r: 19 };
 
 const CONNECTIONS = [
   { from: 'orchestrator', to: 'analytics',        type: 'primary',   fR: 52, tR: 52 },
@@ -604,13 +675,143 @@ function NodeTooltipContent({ name, role, status, configKeys }) {
 }
 
 // ── Config dialog ─────────────────────────────────────────────────────────────
+// ── Agent config form: API key → provider detect → model dropdown ────────────
+function AgentConfigForm({ apiKey, provider, model, models, loadingModels, showKey,
+                           onApiKeyChange, onProviderChange, onModelChange, onToggleShowKey }) {
+  const detected = detectProvider(apiKey);
+  const providerLocked = !!detected;
+  const providerObj = PROVIDERS.find((p) => p.id === provider);
+
+  return (
+    <Box>
+      {/* API Key field */}
+      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.8 }}>
+        API Key
+      </Typography>
+      <TextField
+        fullWidth size="small" variant="outlined"
+        type={showKey ? 'text' : 'password'}
+        value={apiKey} onChange={onApiKeyChange}
+        placeholder="sk-ant-... · sk-... · AIza... · xai-..."
+        InputProps={{
+          sx: { fontFamily: 'monospace', fontSize: '0.82rem' },
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={onToggleShowKey} size="small" edge="end">
+                {showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+      />
+
+      {/* Detection feedback */}
+      <Box sx={{ minHeight: 22, mt: 0.7, display: 'flex', alignItems: 'center', gap: 0.6 }}>
+        {detected && providerObj && (
+          <>
+            <IconCheck size={14} color={C.successDark} />
+            <Typography sx={{ fontSize: '0.72rem', color: 'success.main', fontWeight: 600 }}>
+              Detected: {providerObj.name}
+            </Typography>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: providerObj.color, ml: 0.4 }} />
+          </>
+        )}
+        {!detected && apiKey.length > 0 && (
+          <>
+            <IconAlertCircle size={14} color={C.warningDark} />
+            <Typography sx={{ fontSize: '0.72rem', color: 'warning.main' }}>
+              Provider không nhận diện được — chọn manual bên dưới.
+            </Typography>
+          </>
+        )}
+        {!apiKey && (
+          <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontStyle: 'italic' }}>
+            Nhập API key để load model list từ provider.
+          </Typography>
+        )}
+      </Box>
+
+      {/* Provider dropdown — only when key prefix didn't match any known provider */}
+      {!providerLocked && (
+        <FormControl fullWidth size="small" sx={{ mt: 1.6 }} disabled={!apiKey}>
+          <InputLabel>Provider</InputLabel>
+          <Select label="Provider" value={provider || ''} onChange={onProviderChange}>
+            {PROVIDERS.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: p.color }} />
+                  {p.name}
+                </Box>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+
+      {/* Model dropdown */}
+      <FormControl fullWidth size="small" sx={{ mt: 1.6 }} disabled={!provider || loadingModels}>
+        <InputLabel>Model</InputLabel>
+        <Select label="Model" value={loadingModels ? '' : (model || '')} onChange={onModelChange}
+          startAdornment={loadingModels ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}>
+          {!loadingModels && models.map((m) => (
+            <MenuItem key={m.id} value={m.id}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{m.label}</Typography>
+                {m.note && (
+                  <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontStyle: 'italic' }}>
+                    {m.note}
+                  </Typography>
+                )}
+              </Box>
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary', mt: 1.2, fontStyle: 'italic' }}>
+        Model list được load từ provider sau khi nhập API key hợp lệ.
+      </Typography>
+    </Box>
+  );
+}
+
 function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
+  // Generic config draft (used for non-agent nodes)
   const [draft, setDraft] = useState({});
+  // Agent-specific state
+  const [apiKey, setApiKey] = useState('');
+  const [provider, setProvider] = useState(null);
+  const [model, setModel] = useState('');
+  const [models, setModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
-    if (node?.config) setDraft({ ...node.config });
-    else setDraft({});
-  }, [node]);
+    if (!open || !node) return;
+    if (kind === 'agent') {
+      const initApiKey = node.config?.apiKey || '';
+      const initModel  = node.config?.model  || '';
+      setApiKey(initApiKey);
+      setModel(initModel);
+      setShowKey(false);
+
+      // Detect provider from key, fall back to inferring from existing model name
+      const prov = detectProvider(initApiKey) || inferProviderFromModel(initModel);
+      setProvider(prov);
+
+      if (prov) {
+        setLoadingModels(true);
+        loadModelsFromKey(prov).then((m) => {
+          setModels(m);
+          setLoadingModels(false);
+        });
+      } else {
+        setModels([]);
+      }
+    } else {
+      setDraft({ ...(node.config || {}) });
+    }
+  }, [open, node, kind]);
 
   if (!node) return null;
 
@@ -618,19 +819,62 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
   const status = node.status;
   const statusColor = status ? STATUS_COLOR[status] : null;
 
-  const handleChange = (key) => (e) => {
+  // Handlers — non-agent
+  const handleDraftChange = (key) => (e) => {
     const v = e.target.value;
     setDraft((prev) => ({ ...prev, [key]: v }));
   };
 
+  // Handlers — agent
+  const handleApiKeyChange = (e) => {
+    const v = e.target.value;
+    setApiKey(v);
+    const detected = detectProvider(v);
+    if (detected && detected !== provider) {
+      setProvider(detected);
+      setModel('');
+      setLoadingModels(true);
+      setModels([]);
+      loadModelsFromKey(detected).then((m) => {
+        setModels(m);
+        setLoadingModels(false);
+      });
+    } else if (!detected && !v) {
+      // Clearing key resets to nothing
+      setProvider(null);
+      setModels([]);
+      setModel('');
+    }
+  };
+
+  const handleProviderChange = (e) => {
+    const v = e.target.value;
+    setProvider(v);
+    setModel('');
+    setLoadingModels(true);
+    setModels([]);
+    loadModelsFromKey(v).then((m) => {
+      setModels(m);
+      setLoadingModels(false);
+    });
+  };
+
+  const handleModelChange = (e) => setModel(e.target.value);
+
   const handleSave = () => {
-    onSave?.(node.id, draft);
+    if (kind === 'agent') {
+      onSave?.(node.id, { apiKey, model });
+    } else {
+      onSave?.(node.id, draft);
+    }
     onClose();
   };
 
+  // Save button validation
+  const canSave = kind === 'agent' ? !!(apiKey && model) : true;
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
-      PaperProps={{ sx: { borderRadius: 2 } }}>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', pb: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
@@ -659,14 +903,12 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
       </DialogTitle>
 
       <DialogContent dividers sx={{ py: 2 }}>
-        {/* Description */}
         {node.description && (
           <Typography sx={{ fontSize: '0.82rem', color: 'text.secondary', mb: 2, lineHeight: 1.6 }}>
             {node.description}
           </Typography>
         )}
 
-        {/* Capabilities (agents only) */}
         {node.capabilities?.length > 0 && (
           <Box sx={{ mb: 2.5 }}>
             <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.8 }}>
@@ -678,15 +920,26 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
           </Box>
         )}
 
-        {/* Editable config */}
-        {Object.keys(draft).length > 0 && (
-          <Box sx={{ mb: kind === 'agent' ? 2.5 : 0 }}>
+        {/* Configuration — agents use key+model form, others use generic textfield loop */}
+        {kind === 'agent' ? (
+          <Box sx={{ mb: node.stats ? 2.5 : 0 }}>
+            <AgentConfigForm
+              apiKey={apiKey} provider={provider} model={model}
+              models={models} loadingModels={loadingModels} showKey={showKey}
+              onApiKeyChange={handleApiKeyChange}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+              onToggleShowKey={() => setShowKey((s) => !s)}
+            />
+          </Box>
+        ) : Object.keys(draft).length > 0 && (
+          <Box>
             <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
               Configuration
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
               {Object.entries(draft).map(([key, value]) => (
-                <TextField key={key} label={key} value={value ?? ''} onChange={handleChange(key)}
+                <TextField key={key} label={key} value={value ?? ''} onChange={handleDraftChange(key)}
                   size="small" fullWidth variant="outlined"
                   InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.78rem' } }}
                   inputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
@@ -695,7 +948,6 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
           </Box>
         )}
 
-        {/* Tool list (tool bundles) */}
         {node.toolGroups?.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
@@ -718,7 +970,6 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
           </Box>
         )}
 
-        {/* Stats (agents only) */}
         {node.stats && (
           <>
             <Divider sx={{ my: 2 }} />
@@ -747,7 +998,8 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
         <Button onClick={onClose} color="inherit">Hủy</Button>
-        <Button onClick={handleSave} variant="contained" sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
+        <Button onClick={handleSave} variant="contained" disabled={!canSave}
+          sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
           Lưu cấu hình
         </Button>
       </DialogActions>
@@ -842,7 +1094,7 @@ export default function AgentDiagram() {
 
   return (
     <Box>
-      <svg viewBox="0 0 1100 760" width="100%" style={{ display: 'block', maxHeight: 'calc(100vh - 320px)', minHeight: 360 }}>
+      <svg viewBox="0 0 1400 760" width="100%" style={{ display: 'block', maxHeight: 'calc(100vh - 320px)', minHeight: 360 }}>
         <defs>
           <pattern id="dot-grid" width="22" height="22" patternUnits="userSpaceOnUse">
             <circle cx="11" cy="11" r="0.65" fill={dotColor} />
@@ -853,10 +1105,8 @@ export default function AgentDiagram() {
           </radialGradient>
         </defs>
 
-        <rect width="1100" height="760" fill="url(#dot-grid)" />
-        <rect width="1100" height="760" fill="url(#bg-radial)" />
 
-        <line x1="18" y1="558" x2="1082" y2="558" stroke="rgba(0,0,0,0.06)" strokeWidth="1" strokeDasharray="10 10" />
+        <line x1="18" y1="558" x2="1382" y2="558" stroke="rgba(0,0,0,0.06)" strokeWidth="1" strokeDasharray="10 10" />
 
         <text x={22} y={30} fill={alpha(C.primaryMain, 0.55)} fontSize="7.5" fontFamily="'Roboto Mono',monospace" letterSpacing="1">
           REQUEST · RESPONSE TIER
@@ -867,11 +1117,11 @@ export default function AgentDiagram() {
 
         {activeFlow && (
           <g style={{ pointerEvents: 'none' }}>
-            <rect x={870} y={14} width={216} height={22} rx={11} fill={alpha(C.successDark, 0.15)} stroke={alpha(C.successDark, 0.45)} strokeWidth="1" />
-            <circle cx={886} cy={25} r={3.5} fill={C.successDark}>
+            <rect x={1170} y={14} width={216} height={22} rx={11} fill={alpha(C.successDark, 0.15)} stroke={alpha(C.successDark, 0.45)} strokeWidth="1" />
+            <circle cx={1186} cy={25} r={3.5} fill={C.successDark}>
               <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
             </circle>
-            <text x={896} y={29} fill={C.successDark} fontSize="9" fontWeight="700" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3">
+            <text x={1196} y={29} fill={C.successDark} fontSize="9" fontWeight="700" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3">
               {activeFlow.name.toUpperCase()}
             </text>
           </g>
@@ -959,10 +1209,10 @@ export default function AgentDiagram() {
         ))}
 
         {/* SHARED markers on Qdrant & Google */}
-        <text x={148} y={248} textAnchor="middle" fill={alpha(C.grey700, 0.65)} fontSize="6.5" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3" style={{ pointerEvents: 'none' }}>
+        <text x={188} y={248} textAnchor="middle" fill={alpha(C.grey700, 0.65)} fontSize="6.5" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3" style={{ pointerEvents: 'none' }}>
           SHARED
         </text>
-        <text x={952} y={248} textAnchor="middle" fill={alpha(C.grey700, 0.65)} fontSize="6.5" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3" style={{ pointerEvents: 'none' }}>
+        <text x={1212} y={248} textAnchor="middle" fill={alpha(C.grey700, 0.65)} fontSize="6.5" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3" style={{ pointerEvents: 'none' }}>
           SHARED
         </text>
       </svg>
