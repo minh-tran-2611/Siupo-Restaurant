@@ -40,6 +40,9 @@ const OrderList = Loadable(lazy(() => import('views/pages/orders/OrderList')));
 
 // vouchers routing
 const VoucherManagement = Loadable(lazy(() => import('views/pages/vouchers/VoucherManagement')));
+
+// agent management routing
+const AgentManagement = Loadable(lazy(() => import('views/pages/agent/AgentManagement')));
 // ==============================|| MAIN ROUTING ||============================== //
 
 const MainRoutes = {
@@ -179,6 +182,15 @@ const MainRoutes = {
         {
           path: 'management',
           element: <VoucherManagement />
+        }
+      ]
+    },
+    {
+      path: 'agent',
+      children: [
+        {
+          path: 'management',
+          element: <AgentManagement />
         }
       ]
     }
