@@ -114,7 +114,7 @@ const AGENTS = [
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 4,
-    stats: { callsToday: 142, avgLatency: '1.4s', successRate: '94%' },
+    stats: { callsToday: 142 },
   },
   {
     id: 'analytics', name: 'Analytics',
@@ -130,7 +130,7 @@ const AGENTS = [
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 20,
-    stats: { callsToday: 38, avgLatency: '2.6s', successRate: '97%' },
+    stats: { callsToday: 38 },
   },
   {
     id: 'management', name: 'Management',
@@ -146,7 +146,7 @@ const AGENTS = [
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 47,
-    stats: { callsToday: 76, avgLatency: '1.8s', successRate: '91%' },
+    stats: { callsToday: 76 },
   },
   {
     id: 'ingest', name: 'Ingest',
@@ -161,7 +161,7 @@ const AGENTS = [
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 0,
-    stats: { callsToday: 142, avgLatency: '0.7s', successRate: '99%' },
+    stats: { callsToday: 142 },
   },
   {
     id: 'consolidate', name: 'Consolidate',
@@ -176,7 +176,7 @@ const AGENTS = [
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 0,
-    stats: { callsToday: 1, avgLatency: '4.5s', successRate: '100%' },
+    stats: { callsToday: 1 },
   },
 ];
 
@@ -189,8 +189,36 @@ const TOOL_BUNDLES = [
     x: 64, y: 530, r: 34,
     gradient: [C.secondaryMain, C.secondaryDark],
     toolGroups: [
-      { label: 'Analytics API', tools: ['Summary', 'Revenue', 'Orders', 'Products', 'Customers', 'Booking', 'Insights'] },
-      { label: 'Shared Read',   tools: ['Products', 'Combos', 'Categories', 'Tags', 'Orders', 'Vouchers', 'Reviews', 'Search'] },
+      {
+        label: 'Analytics API',
+        tools: [
+          { n: 'get_analytics_summary',   fn: 'Tổng quan KPIs theo period (doanh thu, đơn, khách)' },
+          { n: 'get_revenue_analytics',   fn: 'Báo cáo doanh thu chi tiết theo period' },
+          { n: 'get_order_analytics',     fn: 'Phân tích đơn hàng: trạng thái, hủy, hoàn thành' },
+          { n: 'get_product_analytics',   fn: 'Top sản phẩm bán chạy & hiệu suất' },
+          { n: 'get_customer_analytics',  fn: 'Phân khúc khách, VIP, retention' },
+          { n: 'get_booking_analytics',   fn: 'Thống kê đặt bàn & lịch sử' },
+          { n: 'get_analytics_insights',  fn: 'AI insights & khuyến nghị business' },
+        ],
+      },
+      {
+        label: 'Shared Read',
+        tools: [
+          { n: 'get_search_products',      fn: 'Tìm/list sản phẩm để bổ sung context' },
+          { n: 'get_all_combos',           fn: 'Lấy danh sách combo' },
+          { n: 'get_categories',           fn: 'Lấy danh mục sản phẩm' },
+          { n: 'get_all_customers',        fn: 'Danh sách khách để phân tích sâu' },
+          { n: 'get_all_tags',             fn: 'Danh sách tag để cross-reference' },
+          { n: 'get_all_orders_admin',     fn: 'Lấy đơn hàng (filter theo status/period)' },
+          { n: 'get_order_detail_admin',   fn: 'Chi tiết đơn hàng theo id' },
+          { n: 'get_all_vouchers_admin',   fn: 'Danh sách voucher (đánh giá hiệu quả)' },
+          { n: 'get_voucher_by_id',        fn: 'Chi tiết voucher theo id' },
+          { n: 'get_order_reviews',        fn: 'Reviews của 1 đơn hàng' },
+          { n: 'get_reviews_by_order',     fn: 'Reviews đầy đủ theo order' },
+          { n: 'get_review_by_order_item', fn: 'Review của 1 line-item' },
+          { n: 'search_internet',          fn: 'Tìm thông tin bổ sung từ Google CSE' },
+        ],
+      },
     ],
   },
   {
@@ -200,14 +228,98 @@ const TOOL_BUNDLES = [
     x: 1336, y: 530, r: 34,
     gradient: [C.primary200, C.primaryDark],
     toolGroups: [
-      { label: 'Banner',   tools: ['GetAll', 'GetById', 'Create', 'Update', 'Delete'] },
-      { label: 'Category', tools: ['GetAll', 'Create', 'Update', 'Delete'] },
-      { label: 'Combo',    tools: ['GetAll', 'GetById', 'Create', 'Update', 'Delete', 'Toggle'] },
-      { label: 'Product',  tools: ['Search', 'Create', 'Update', 'Delete', 'Toggle'] },
-      { label: 'Order',    tools: ['GetAll', 'GetDetail', 'UpdateStatus', 'Delete', 'Reviews'] },
-      { label: 'Voucher',  tools: ['Public', 'Admin', 'ById', 'ByCode', 'Create', 'Update', 'Delete', 'Toggle'] },
-      { label: 'Tag',      tools: ['GetAll', 'GetById', 'Create', 'Update', 'Delete'] },
-      { label: 'Other',    tools: ['User×2', 'Notification×3', 'Review×2', 'Auth', 'Search'] },
+      {
+        label: 'Banner',
+        tools: [
+          { n: 'get_all_banners',   fn: 'Lấy toàn bộ banner (vị trí, ảnh)' },
+          { n: 'get_banner_by_id',  fn: 'Chi tiết banner theo id' },
+          { n: 'create_banner',     fn: 'Tạo banner ở vị trí trống' },
+          { n: 'update_banner',     fn: 'Cập nhật url/position banner' },
+          { n: 'delete_banner',     fn: 'Xóa banner theo id' },
+        ],
+      },
+      {
+        label: 'Category',
+        tools: [
+          { n: 'get_categories',   fn: 'Lấy danh sách danh mục' },
+          { n: 'create_category',  fn: 'Tạo danh mục mới (kèm ảnh)' },
+          { n: 'update_category',  fn: 'Cập nhật tên/ảnh danh mục' },
+          { n: 'delete_category',  fn: 'Xóa danh mục theo id' },
+        ],
+      },
+      {
+        label: 'Combo',
+        tools: [
+          { n: 'get_all_combos',       fn: 'Lấy danh sách combo' },
+          { n: 'get_combo_by_id',      fn: 'Chi tiết combo theo id' },
+          { n: 'create_combo',         fn: 'Tạo combo mới (gồm sản phẩm + giá)' },
+          { n: 'update_combo',         fn: 'Cập nhật combo' },
+          { n: 'delete_combo',         fn: 'Xóa combo' },
+          { n: 'toggle_combo_status',  fn: 'Bật/tắt trạng thái combo' },
+        ],
+      },
+      {
+        label: 'Product',
+        tools: [
+          { n: 'get_search_products',     fn: 'Tìm/list sản phẩm theo từ khóa' },
+          { n: 'create_product',          fn: 'Tạo sản phẩm mới' },
+          { n: 'update_product',          fn: 'Cập nhật sản phẩm' },
+          { n: 'delete_product',          fn: 'Xóa sản phẩm' },
+          { n: 'toggle_product_status',   fn: 'Bật/tắt trạng thái bán' },
+        ],
+      },
+      {
+        label: 'Order',
+        tools: [
+          { n: 'get_all_orders_admin',     fn: 'Danh sách đơn (filter status/period)' },
+          { n: 'get_order_detail_admin',   fn: 'Chi tiết đơn hàng theo id' },
+          { n: 'update_order_status',      fn: 'Cập nhật trạng thái đơn (PENDING/PAID/...)' },
+          { n: 'delete_order',             fn: 'Xóa đơn hàng' },
+          { n: 'get_order_reviews',        fn: 'Reviews của đơn hàng' },
+        ],
+      },
+      {
+        label: 'Voucher',
+        tools: [
+          { n: 'get_public_vouchers',      fn: 'Voucher public cho khách' },
+          { n: 'get_all_vouchers_admin',   fn: 'Toàn bộ voucher (admin)' },
+          { n: 'get_voucher_by_id',        fn: 'Chi tiết voucher theo id' },
+          { n: 'get_voucher_by_code',      fn: 'Tra voucher theo code' },
+          { n: 'create_voucher',           fn: 'Tạo voucher (giảm giá %, max, hạn)' },
+          { n: 'update_voucher',           fn: 'Cập nhật voucher' },
+          { n: 'delete_voucher',           fn: 'Xóa voucher' },
+          { n: 'toggle_voucher_status',    fn: 'Bật/tắt voucher' },
+        ],
+      },
+      {
+        label: 'Tag',
+        tools: [
+          { n: 'get_all_tags',  fn: 'Lấy danh sách tag' },
+          { n: 'get_tag_by_id', fn: 'Chi tiết tag theo id' },
+          { n: 'create_tag',    fn: 'Tạo tag mới' },
+          { n: 'update_tag',    fn: 'Cập nhật tag' },
+          { n: 'delete_tag',    fn: 'Xóa tag' },
+        ],
+      },
+      {
+        label: 'User & Notification',
+        tools: [
+          { n: 'get_all_customers',           fn: 'Danh sách khách hàng' },
+          { n: 'update_customer_status',      fn: 'Cập nhật trạng thái khách (kích hoạt/khóa)' },
+          { n: 'get_all_notifications_admin', fn: 'Toàn bộ thông báo (admin)' },
+          { n: 'create_notification',         fn: 'Tạo thông báo gửi user' },
+          { n: 'get_my_notifications',        fn: 'Thông báo của user hiện tại' },
+        ],
+      },
+      {
+        label: 'Review & Other',
+        tools: [
+          { n: 'get_reviews_by_order',     fn: 'Toàn bộ review của 1 đơn' },
+          { n: 'get_review_by_order_item', fn: 'Review theo line-item' },
+          { n: 'login',                    fn: 'Đăng nhập lấy access token' },
+          { n: 'search_internet',          fn: 'Google search bổ sung context' },
+        ],
+      },
     ],
   },
 ];
@@ -259,7 +371,25 @@ const CHANNELS = [
   { id: 'gmail', name: 'Gmail', x: 929, y: 58, r: 22, color: '#EA4335' },
 ];
 
-const SCHEDULER_NODE = { id: 'scheduler', x: 1265, y: 612, r: 19 };
+const SCHEDULER_NODE = {
+  id: 'scheduler',
+  name: 'APScheduler',
+  role: 'Trigger định kỳ cho Consolidate agent',
+  description: 'Background scheduler chạy bên trong AiAgent-service (FastAPI lifespan). Kích hoạt Consolidate agent theo chu kỳ để gộp raw memories thành consolidated summaries trong Turso.',
+  capabilities: [
+    'Kích hoạt run_consolidate_agent mỗi N giờ',
+    'Replace_existing job để tránh duplicate',
+    'Tự dừng khi FastAPI shutdown',
+  ],
+  config: {
+    intervalHours: 24,
+    jobId: 'consolidate_agent_job',
+    triggerType: 'interval',
+    target: 'consolidate_agent',
+  },
+  x: 1265, y: 612, r: 19,
+  gradient: [C.warningDark, C.warningMain],
+};
 
 const CONNECTIONS = [
   { from: 'orchestrator', to: 'analytics',        type: 'primary',   fR: 52, tR: 52 },
@@ -608,19 +738,24 @@ function ChannelNode({ node }) {
   );
 }
 
-function SchedulerNode({ node }) {
+function SchedulerNode({ node, isHovered, onHover, onLeave, onClick }) {
   const amber = C.warningDark;
   return (
-    <g style={{ pointerEvents: 'none' }}>
-      <circle cx={node.x} cy={node.y} r={node.r + 4} fill="none" stroke={alpha(amber, 0.5)} strokeWidth="1" strokeDasharray="3 3">
+    <g onMouseEnter={onHover} onMouseLeave={onLeave} onClick={onClick} style={{ cursor: 'pointer' }}>
+      <circle cx={node.x} cy={node.y} r={node.r + 4} fill="none" stroke={alpha(amber, 0.5)} strokeWidth="1" strokeDasharray="3 3" style={{ pointerEvents: 'none' }}>
         <animateTransform attributeName="transform" type="rotate" from={`0 ${node.x} ${node.y}`} to={`360 ${node.x} ${node.y}`} dur="14s" repeatCount="indefinite" />
       </circle>
-      <circle cx={node.x} cy={node.y} r={node.r} fill={C.darkLevel1} stroke={amber} strokeWidth="1.5" opacity="0.85" />
-      <circle cx={node.x} cy={node.y} r={node.r - 4} fill="none" stroke={alpha(amber, 0.3)} strokeWidth="1" />
-      <line x1={node.x} y1={node.y} x2={node.x} y2={node.y - node.r + 7} stroke={amber} strokeWidth="1.8" strokeLinecap="round" />
-      <line x1={node.x} y1={node.y} x2={node.x + node.r - 7} y2={node.y} stroke={amber} strokeWidth="1.3" strokeLinecap="round" />
-      <circle cx={node.x} cy={node.y} r="1.8" fill={amber} />
-      <text x={node.x} y={node.y + node.r + 13} textAnchor="middle" fill={amber} fontSize="7.5" fontWeight="700" fontFamily="'Roboto Mono',monospace">24h</text>
+      <circle cx={node.x} cy={node.y} r={node.r} fill={C.darkLevel1}
+        stroke={isHovered ? 'rgba(255,255,255,0.85)' : amber}
+        strokeWidth={isHovered ? 2 : 1.5}
+        opacity={isHovered ? 1 : 0.85} />
+      <circle cx={node.x} cy={node.y} r={node.r - 4} fill="none" stroke={alpha(amber, 0.3)} strokeWidth="1" style={{ pointerEvents: 'none' }} />
+      <line x1={node.x} y1={node.y} x2={node.x} y2={node.y - node.r + 7} stroke={amber} strokeWidth="1.8" strokeLinecap="round" style={{ pointerEvents: 'none' }} />
+      <line x1={node.x} y1={node.y} x2={node.x + node.r - 7} y2={node.y} stroke={amber} strokeWidth="1.3" strokeLinecap="round" style={{ pointerEvents: 'none' }} />
+      <circle cx={node.x} cy={node.y} r="1.8" fill={amber} style={{ pointerEvents: 'none' }} />
+      <text x={node.x} y={node.y + node.r + 13} textAnchor="middle" fill={amber} fontSize="7.5" fontWeight="700" fontFamily="'Roboto Mono',monospace" style={{ pointerEvents: 'none' }}>
+        {node.config?.intervalHours || 24}h
+      </text>
     </g>
   );
 }
@@ -932,6 +1067,35 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
               onToggleShowKey={() => setShowKey((s) => !s)}
             />
           </Box>
+        ) : kind === 'scheduler' ? Object.keys(draft).length > 0 && (
+          <Box>
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
+              Schedule configuration
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6 }}>
+              {Object.entries(draft).map(([key, value]) => (
+                <Box key={key} sx={{
+                  display: 'flex', alignItems: 'baseline', gap: 1.5,
+                  py: 0.6, px: 1.2, borderRadius: 0.8,
+                  bgcolor: alpha(accent, 0.05),
+                  borderLeft: `2px solid ${alpha(accent, 0.45)}`,
+                }}>
+                  <Typography sx={{
+                    fontFamily: 'monospace', fontSize: '0.74rem', fontWeight: 700,
+                    color: accent, minWidth: 130,
+                  }}>
+                    {key}
+                  </Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'text.primary' }}>
+                    {String(value)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary', mt: 1.2, fontStyle: 'italic' }}>
+              Interval cấu hình qua env var <code>CONSOLIDATE_INTERVAL_HOURS</code> trên AiAgent-service.
+            </Typography>
+          </Box>
         ) : Object.keys(draft).length > 0 && (
           <Box>
             <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
@@ -954,16 +1118,35 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
               Tool registry ({node.countLabel})
             </Typography>
             {node.toolGroups.map((group, gi) => (
-              <Box key={gi} sx={{ mb: gi < node.toolGroups.length - 1 ? 1.2 : 0 }}>
-                <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, color: 'text.secondary', mb: 0.4 }}>
+              <Box key={gi} sx={{ mb: gi < node.toolGroups.length - 1 ? 1.5 : 0 }}>
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.5px', mb: 0.6 }}>
                   {group.label}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {group.tools.map((tool, ti) => (
-                    <Chip key={ti} label={tool} size="small"
-                      sx={{ height: 22, fontSize: '0.7rem', fontFamily: 'monospace',
-                            bgcolor: alpha(accent, 0.10), color: accent, fontWeight: 500 }} />
-                  ))}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  {group.tools.map((tool, ti) => {
+                    const name = typeof tool === 'string' ? tool : tool.n;
+                    const fn   = typeof tool === 'string' ? null   : tool.fn;
+                    return (
+                      <Box key={ti} sx={{
+                        display: 'flex', alignItems: 'baseline', gap: 1,
+                        py: 0.5, px: 1, borderRadius: 0.8,
+                        bgcolor: alpha(accent, 0.04),
+                        borderLeft: `2px solid ${alpha(accent, 0.45)}`,
+                      }}>
+                        <Typography sx={{
+                          fontFamily: 'monospace', fontSize: '0.74rem',
+                          fontWeight: 600, color: accent, whiteSpace: 'nowrap',
+                        }}>
+                          {name}
+                        </Typography>
+                        {fn && (
+                          <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', lineHeight: 1.45 }}>
+                            — {fn}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             ))}
@@ -979,8 +1162,6 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
             <Box sx={{ display: 'flex', gap: 1.5 }}>
               {[
                 { label: 'Calls', value: node.stats.callsToday },
-                { label: 'Avg latency', value: node.stats.avgLatency },
-                { label: 'Success rate', value: node.stats.successRate },
               ].map((s) => (
                 <Box key={s.label} sx={{ flex: 1, textAlign: 'center', bgcolor: alpha(accent, 0.06), borderRadius: 1.2, py: 1.2 }}>
                   <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: accent, lineHeight: 1.1 }}>
@@ -997,11 +1178,20 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
-        <Button onClick={onClose} color="inherit">Hủy</Button>
-        <Button onClick={handleSave} variant="contained" disabled={!canSave}
-          sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
-          Lưu cấu hình
-        </Button>
+        {kind === 'bundle' || kind === 'scheduler' ? (
+          <Button onClick={onClose} variant="contained"
+            sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
+            Đóng
+          </Button>
+        ) : (
+          <>
+            <Button onClick={onClose} color="inherit">Hủy</Button>
+            <Button onClick={handleSave} variant="contained" disabled={!canSave}
+              sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
+              Lưu cấu hình
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -1183,9 +1373,26 @@ export default function AgentDiagram() {
           </Tooltip>
         ))}
 
-        {/* Channels & scheduler — passive */}
+        {/* Channels — passive */}
         {CHANNELS.map((ch) => <ChannelNode key={ch.id} node={ch} />)}
-        <SchedulerNode node={SCHEDULER_NODE} />
+
+        {/* Scheduler — interactive */}
+        <Tooltip
+          title={<NodeTooltipContent name={SCHEDULER_NODE.name} role={SCHEDULER_NODE.role}
+            configKeys={Object.keys(SCHEDULER_NODE.config || {})} />}
+          placement="top" arrow enterDelay={150} leaveDelay={50}
+          componentsProps={{ tooltip: { sx: tooltipSx } }}
+        >
+          <g>
+            <SchedulerNode
+              node={SCHEDULER_NODE}
+              isHovered={hoveredId === SCHEDULER_NODE.id}
+              onHover={() => setHoveredId(SCHEDULER_NODE.id)}
+              onLeave={() => setHoveredId(null)}
+              onClick={() => openDialog(SCHEDULER_NODE, 'scheduler')}
+            />
+          </g>
+        </Tooltip>
 
         {/* Agent nodes */}
         {AGENTS.map((agent) => (

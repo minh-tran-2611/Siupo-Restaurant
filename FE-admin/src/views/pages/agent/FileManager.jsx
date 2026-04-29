@@ -4,7 +4,6 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
-import LinearProgress from '@mui/material/LinearProgress';
 import { useTheme, alpha } from '@mui/material/styles';
 
 // design tokens — same source as palette.jsx
@@ -234,11 +233,6 @@ export default function FileManager({ hideHeader = false }) {
   const agentFileCount = MOCK_FILES.filter((f) => f.source === 'agent').length;
   const qdrantFileCount = MOCK_FILES.filter((f) => f.source === 'qdrant').length;
 
-  // Storage calculation (mock)
-  const totalStorage = 2.8;
-  const usedStorage = 0.56;
-  const storagePercent = (usedStorage / totalStorage) * 100;
-
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header — ẩn khi dùng trong MainCard có title */}
@@ -284,31 +278,6 @@ export default function FileManager({ hideHeader = false }) {
           </Tooltip>
         </Box>
       )}
-
-      {/* Storage bar */}
-      <Box sx={{ mb: 2, p: 1.25, borderRadius: 2, bgcolor: alpha(theme.palette.grey[100], 0.8) }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="caption" sx={{ fontWeight: 500, color: theme.palette.grey[700], fontSize: '0.7rem' }}>
-            Storage
-          </Typography>
-          <Typography variant="caption" sx={{ color: theme.palette.grey[500], fontSize: '0.7rem' }}>
-            {usedStorage} GB / {totalStorage} GB
-          </Typography>
-        </Box>
-        <LinearProgress
-          variant="determinate"
-          value={storagePercent}
-          sx={{
-            height: 6,
-            borderRadius: 3,
-            bgcolor: alpha(theme.palette.grey[300], 0.3),
-            '& .MuiLinearProgress-bar': {
-              borderRadius: 3,
-              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
-            }
-          }}
-        />
-      </Box>
 
       {/* Filter chips */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>

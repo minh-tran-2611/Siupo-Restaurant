@@ -22,7 +22,6 @@ import {
   IconRobot,
   IconCircleFilled,
   IconListCheck,
-  IconBolt,
   IconCpu,
   IconBrain
 } from '@tabler/icons-react';
@@ -35,7 +34,6 @@ function AgentHeroCard() {
   const stats = [
     { value: '6 / 6', label: 'Agents Online', icon: IconRobot },
     { value: '8', label: 'Tasks Today', icon: IconListCheck },
-    { value: '87.5%', label: 'Success Rate', icon: IconBolt },
     { value: '56', label: 'Tools Available', icon: IconCpu }
   ];
 
@@ -120,15 +118,15 @@ function AgentHeroCard() {
           {stats.map((stat, i) => {
             const Icon = stat.icon;
             return (
-              <Grid key={i} size={{ xs: 6, sm: 3 }}>
+              <Grid key={i} size={{ xs: 6, sm: 4 }}>
                 <Box
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.25,
-                    pr: { xs: 0, sm: i < 3 ? 2 : 0 },
+                    pr: { xs: 0, sm: i < stats.length - 1 ? 2 : 0 },
                     pl: { xs: 0, sm: i > 0 ? 2 : 0 },
-                    borderRight: i < 3 ? { xs: 'none', sm: `1px solid ${alpha('#fff', 0.15)}` } : 'none',
+                    borderRight: i < stats.length - 1 ? { xs: 'none', sm: `1px solid ${alpha('#fff', 0.15)}` } : 'none',
                     mb: { xs: 2, sm: 0 }
                   }}
                 >
