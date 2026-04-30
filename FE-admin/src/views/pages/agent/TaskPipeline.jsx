@@ -15,125 +15,93 @@ import { IconChevronRight, IconClock, IconCheck, IconX, IconLoader2 } from '@tab
 
 // ==============================|| TASK PIPELINE ||============================== //
 
-// ── Agent color mapping (resolved from theme tokens) ──────────────────────────
-const AGENT_COLOR = {
-  analytics:   C.secondaryMain,
-  management:  C.primaryMain,
-  consolidate: C.secondary200,
-  ingest:      C.grey600,
-  orchestrator: C.primaryMain,
-};
-
 const MOCK_TASKS = [
   {
     id: 1,
-    title: 'Phân tích doanh thu tháng 4',
-    agent: 'analytics',
-    agentIcon: '📊',
+    title: 'Cho anh xem doanh thu tháng 4',
     status: 'completed',
     timestamp: '14:21',
     duration: '2.1s',
-    toolCalls: 3,
-    tools: ['get_analytics_summary', 'get_revenue_analytics', 'get_product_analytics'],
-    result: 'Doanh thu tháng 4: 125.6M VNĐ, tăng 12% so với tháng trước. Top seller: Phở Bò (320 phần). Khuyến nghị: Tăng combo Gia Đình vào cuối tuần.'
+    tools: ['call_analytics_agent'],
+    response:
+      'Doanh thu tháng 4: 125.6M VNĐ, tăng 12% so với tháng trước. Top seller: Phở Bò (320 phần). Khuyến nghị: Tăng combo Gia Đình vào cuối tuần.'
   },
   {
     id: 2,
-    title: 'Thêm sản phẩm Bún Bò Huế giá 55.000đ',
-    agent: 'management',
-    agentIcon: '⚙️',
+    title: 'Thêm sản phẩm Bún Bò Huế giá 55.000đ vào menu',
     status: 'completed',
     timestamp: '14:18',
     duration: '1.4s',
-    toolCalls: 2,
-    tools: ['get_categories', 'create_product'],
-    result: 'Đã tạo sản phẩm "Bún Bò Huế" trong danh mục "Món Chính", giá 55.000đ, status: AVAILABLE.'
+    tools: ['call_management_agent'],
+    response: 'Đã tạo sản phẩm "Bún Bò Huế" trong danh mục "Món Chính", giá 55.000đ, status: AVAILABLE.'
   },
   {
     id: 3,
-    title: 'Tìm kiếm khách hàng VIP',
-    agent: 'management',
-    agentIcon: '⚙️',
+    title: 'Tìm khách hàng VIP đặt trên 10 đơn mỗi tháng',
     status: 'completed',
     timestamp: '14:15',
     duration: '0.9s',
-    toolCalls: 1,
-    tools: ['get_all_customers'],
-    result: 'Tìm thấy 23 khách hàng VIP (đặt >10 đơn/tháng). Top: Nguyễn Văn A (45 đơn).'
+    tools: ['call_management_agent'],
+    response: 'Tìm thấy 23 khách hàng VIP (đặt >10 đơn/tháng). Top: Nguyễn Văn A (45 đơn).'
   },
   {
     id: 4,
-    title: 'Cập nhật banner trang chủ',
-    agent: 'management',
-    agentIcon: '⚙️',
+    title: 'Cập nhật banner trang chủ thành banner mới',
     status: 'failed',
     timestamp: '14:10',
     duration: '3.2s',
-    toolCalls: 2,
-    tools: ['get_all_banners', 'update_banner'],
-    result: 'Lỗi: Banner position Home1 đã bị chiếm. Không thể cập nhật.'
+    tools: ['call_management_agent'],
+    response: 'Lỗi: Banner position Home1 đã bị chiếm. Không thể cập nhật.'
   },
   {
     id: 5,
-    title: 'Tạo voucher giảm 20% dịp lễ',
-    agent: 'management',
-    agentIcon: '⚙️',
+    title: 'Tạo voucher giảm 20% dịp lễ tên HOLIDAY20',
     status: 'completed',
     timestamp: '13:55',
     duration: '1.8s',
-    toolCalls: 2,
-    tools: ['get_voucher_by_code', 'create_voucher'],
-    result: 'Voucher HOLIDAY20 đã tạo: Giảm 20%, tối đa 100K, từ 25/04 - 05/05.'
+    tools: ['call_management_agent'],
+    response: 'Voucher HOLIDAY20 đã tạo: Giảm 20%, tối đa 100K, từ 25/04 - 05/05.'
   },
   {
     id: 6,
-    title: 'Thống kê đơn hàng bị hủy tuần này',
-    agent: 'analytics',
-    agentIcon: '📊',
+    title: 'Thống kê đơn hàng bị hủy tuần này, phân tích nguyên nhân',
     status: 'completed',
     timestamp: '13:40',
     duration: '2.8s',
-    toolCalls: 4,
-    tools: ['get_order_analytics', 'get_all_orders_admin', 'get_order_detail_admin', 'get_analytics_insights'],
-    result: '18 đơn bị hủy (8.2%). Nguyên nhân chính: khách không thanh toán (44%), hết hàng (28%).'
+    tools: ['call_analytics_agent', 'search_documents'],
+    response: '18 đơn bị hủy (8.2%). Nguyên nhân chính: khách không thanh toán (44%), hết hàng (28%).'
   },
   {
     id: 7,
-    title: 'Memory consolidation hàng ngày',
-    agent: 'consolidate',
-    agentIcon: '🔄',
+    title: 'Chính sách hoàn tiền của nhà hàng là gì?',
     status: 'completed',
-    timestamp: '03:00',
-    duration: '4.5s',
-    toolCalls: 0,
-    tools: [],
-    result: '24 memories → 8 consolidated summaries. Đã xóa 24 bản gốc.'
+    timestamp: '13:20',
+    duration: '1.2s',
+    tools: ['search_documents'],
+    response:
+      'Theo chính sách hiện tại, khách được hoàn 100% nếu hủy trước 24h, 50% nếu hủy trước 12h, không hoàn nếu hủy dưới 12h.'
   },
   {
     id: 8,
-    title: 'Báo cáo hiệu suất sản phẩm',
-    agent: 'analytics',
-    agentIcon: '📊',
+    title: 'Báo cáo hiệu suất sản phẩm và combo Q2',
     status: 'processing',
     timestamp: '14:22',
     duration: '...',
-    toolCalls: 2,
-    tools: ['get_product_analytics', 'get_all_combos'],
-    result: null
+    tools: ['call_analytics_agent'],
+    response: null
   }
 ];
 
 const statusConfig = {
-  completed: { color: C.successDark, bg: C.successLight, icon: IconCheck, label: 'Hoàn thành' },
-  failed: { color: C.errorMain, bg: C.errorLight, icon: IconX, label: 'Thất bại' },
-  processing: { color: C.secondaryMain, bg: C.secondaryLight, icon: IconLoader2, label: 'Đang xử lý' }
+  completed: { color: C.successDark, bg: C.successLight, accent: C.successMain, icon: IconCheck, label: 'Hoàn thành' },
+  failed: { color: C.errorMain, bg: C.errorLight, accent: C.errorMain, icon: IconX, label: 'Thất bại' },
+  processing: { color: C.secondaryMain, bg: C.secondaryLight, accent: C.secondaryMain, icon: IconLoader2, label: 'Đang xử lý' }
 };
 
 function TaskItem({ task, isExpanded, onToggle }) {
   const theme = useTheme();
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
-  const agentColor = AGENT_COLOR[task.agent] || C.grey500;
 
   return (
     <Box
@@ -143,18 +111,18 @@ function TaskItem({ task, isExpanded, onToggle }) {
         borderRadius: 2,
         cursor: 'pointer',
         border: `1px solid ${alpha(theme.palette.grey[200], 0.8)}`,
-        bgcolor: isExpanded ? alpha(agentColor, 0.03) : 'transparent',
+        bgcolor: isExpanded ? alpha(status.accent, 0.03) : 'transparent',
         transition: 'all 0.2s ease',
         '&:hover': {
-          bgcolor: alpha(agentColor, 0.05),
-          borderColor: alpha(agentColor, 0.3),
+          bgcolor: alpha(status.accent, 0.05),
+          borderColor: alpha(status.accent, 0.3),
           transform: 'translateX(4px)'
         }
       }}
     >
       {/* Main row */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        {/* Agent icon */}
+        {/* Status icon */}
         <Box
           sx={{
             width: 32,
@@ -163,29 +131,34 @@ function TaskItem({ task, isExpanded, onToggle }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: alpha(agentColor, 0.1),
-            fontSize: '16px',
+            bgcolor: status.bg,
             flexShrink: 0
           }}
         >
-          {task.agentIcon}
+          <StatusIcon
+            size={16}
+            color={status.color}
+            style={task.status === 'processing' ? { animation: 'spin 1.5s linear infinite' } : {}}
+          />
         </Box>
 
         {/* Task info */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 500,
-              color: theme.palette.grey[800],
-              fontSize: '0.8rem',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
-            {task.title}
-          </Typography>
+          <Tooltip title={task.title} placement="top-start" arrow enterDelay={500}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 500,
+                color: theme.palette.grey[800],
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {task.title}
+            </Typography>
+          </Tooltip>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
             <IconClock size={11} color={theme.palette.grey[400]} />
             <Typography variant="caption" sx={{ color: theme.palette.grey[500], fontSize: '0.68rem' }}>
@@ -196,27 +169,20 @@ function TaskItem({ task, isExpanded, onToggle }) {
                 · {task.duration}
               </Typography>
             )}
+            <Typography
+              variant="caption"
+              sx={{
+                color: status.color,
+                fontSize: '0.65rem',
+                fontWeight: 600,
+                ml: 0.5,
+                textTransform: 'uppercase',
+                letterSpacing: 0.3
+              }}
+            >
+              · {status.label}
+            </Typography>
           </Box>
-        </Box>
-
-        {/* Status */}
-        <Box
-          sx={{
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: status.bg,
-            flexShrink: 0
-          }}
-        >
-          <StatusIcon
-            size={13}
-            color={status.color}
-            style={task.status === 'processing' ? { animation: 'spin 1.5s linear infinite' } : {}}
-          />
         </Box>
       </Box>
 
@@ -224,52 +190,94 @@ function TaskItem({ task, isExpanded, onToggle }) {
       {isExpanded && (
         <Fade in timeout={300}>
           <Box sx={{ mt: 1.5, pl: 5.5 }}>
-            {/* Tools used */}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-              {task.tools.map((tool, i) => (
-                <Chip
-                  key={i}
-                  label={tool}
-                  size="small"
-                  sx={{
-                    height: 20,
-                    fontSize: '0.6rem',
-                    bgcolor: alpha(agentColor, 0.08),
-                    color: agentColor,
-                    fontFamily: 'monospace'
-                  }}
-                />
-              ))}
-              {task.tools.length === 0 && (
-                <Chip label="No tools (LLM only)" size="small" sx={{ height: 20, fontSize: '0.6rem' }} />
-              )}
-            </Box>
-
-            {/* Result */}
-            {task.result && (
-              <Box
+            {/* Orchestrator tools used */}
+            <Box sx={{ mb: 1 }}>
+              <Typography
+                variant="caption"
                 sx={{
-                  bgcolor: task.status === 'failed'
-                    ? alpha(C.errorMain, 0.06)
-                    : alpha(agentColor, 0.05),
-                  border: `1px solid ${task.status === 'failed' ? alpha(C.errorMain, 0.18) : alpha(agentColor, 0.15)}`,
-                  borderRadius: 1.5,
-                  p: 1,
-                  mt: 0.5
+                  color: theme.palette.grey[500],
+                  fontSize: '0.62rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  display: 'block',
+                  mb: 0.5
                 }}
               >
+                Orchestrator tools
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {task.tools.length > 0 ? (
+                  task.tools.map((tool, i) => (
+                    <Chip
+                      key={i}
+                      label={tool}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: '0.6rem',
+                        bgcolor: alpha(status.accent, 0.08),
+                        color: status.color,
+                        fontFamily: 'monospace',
+                        '& .MuiChip-label': { px: 0.75 }
+                      }}
+                    />
+                  ))
+                ) : (
+                  <Chip
+                    label="LLM only — no tool calls"
+                    size="small"
+                    sx={{ height: 20, fontSize: '0.6rem', bgcolor: alpha(theme.palette.grey[400], 0.1) }}
+                  />
+                )}
+              </Box>
+            </Box>
+
+            {/* Response */}
+            {task.response ? (
+              <Box>
                 <Typography
                   variant="caption"
                   sx={{
+                    color: theme.palette.grey[500],
+                    fontSize: '0.62rem',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
                     display: 'block',
-                    color: task.status === 'failed' ? C.errorDark : theme.palette.grey[600],
-                    lineHeight: 1.6,
-                    fontSize: '0.72rem'
+                    mb: 0.5
                   }}
                 >
-                  {task.result}
+                  Response
                 </Typography>
+                <Box
+                  sx={{
+                    bgcolor: alpha(status.accent, 0.05),
+                    border: `1px solid ${alpha(status.accent, 0.15)}`,
+                    borderRadius: 1.5,
+                    p: 1
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: 'block',
+                      color: task.status === 'failed' ? C.errorDark : theme.palette.grey[700],
+                      lineHeight: 1.6,
+                      fontSize: '0.72rem'
+                    }}
+                  >
+                    {task.response}
+                  </Typography>
+                </Box>
               </Box>
+            ) : (
+              <Typography
+                variant="caption"
+                sx={{ color: theme.palette.grey[400], fontSize: '0.7rem', fontStyle: 'italic' }}
+              >
+                Đang xử lý, chưa có response...
+              </Typography>
             )}
           </Box>
         </Fade>
@@ -286,7 +294,7 @@ export default function TaskPipeline({ hideHeader = false }) {
     setExpandedTask(expandedTask === id ? null : id);
   };
 
-  // Sort: processing first, then by timestamp desc
+  // Sort: processing first, then keep order
   const sortedTasks = [...MOCK_TASKS].sort((a, b) => {
     if (a.status === 'processing' && b.status !== 'processing') return -1;
     if (b.status === 'processing' && a.status !== 'processing') return 1;
