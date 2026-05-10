@@ -34,7 +34,7 @@ function AgentHeroCard() {
   const stats = [
     { value: '6 / 6', label: 'Agents Online', icon: IconRobot },
     { value: '8', label: 'Tasks Today', icon: IconListCheck },
-    { value: '56', label: 'Tools Available', icon: IconCpu }
+    { value: '67', label: 'Tools Available', icon: IconCpu }
   ];
 
   return (
@@ -197,9 +197,10 @@ export default function AgentManagement() {
       <Grid size={{ xs: 12, md: 7 }}>
         <MainCard
           title="Task Pipeline"
-          sx={{ height: { xs: 'auto', md: 540 }, display: 'flex', flexDirection: 'column' }}
+          sx={{ height: 540, display: 'flex', flexDirection: 'column' }}
           contentSX={{
             flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
             p: '16px !important',
@@ -213,9 +214,10 @@ export default function AgentManagement() {
       <Grid size={{ xs: 12, md: 5 }}>
         <MainCard
           title="File Manager"
-          sx={{ height: { xs: 'auto', md: 540 }, display: 'flex', flexDirection: 'column' }}
+          sx={{ height: 540, display: 'flex', flexDirection: 'column' }}
           contentSX={{
             flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
             p: '16px !important',

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
+import useAgentEventStream from 'hooks/useAgentEventStream';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
@@ -26,7 +27,7 @@ import C from 'assets/scss/_themes-vars.module.scss';
 // ── Status color map (from theme palette) ─────────────────────────────────────
 const STATUS_COLOR = {
   online: C.successDark,
-  task:   C.secondaryMain,
+  task:   C.warningDark,
   idle:   C.grey500,
   error:  C.errorMain,
 };
@@ -101,16 +102,16 @@ async function loadModelsFromKey(provider /* , apiKey */) {
 const AGENTS = [
   {
     id: 'orchestrator', name: 'Orchestrator',
-    role: 'Router & Intent Classifier',
+    role: 'Router & Multimodal LLM',
     gradient: [C.primaryMain, C.primary800],
     x: 700, y: 235, status: 'online',
-    description: 'Router chính — nhận request, phân loại intent, delegate sang Analytics hoặc Management. Hỗ trợ RAG search và internet search.',
+    description: 'Router chính — nhận message + ảnh inline, phân loại intent, delegate sang Analytics/Management qua function calling. Đọc cache (phiên hiện tại) + memories raw + consolidated làm context. Hỗ trợ RAG search và internet search.',
     capabilities: [
-      'Phân loại intent từ user message',
-      'Delegate Analytics / Management agent',
+      'Multimodal: text + image bytes (Gemini vision)',
+      'Function calling: management / analytics agent',
       'RAG search qua Qdrant',
-      'Web search qua Google',
-      'Quản lý conversation memory',
+      'Web search qua Google CSE',
+      '3-layer memory: cache + memories raw + consolidated',
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 4,
@@ -149,15 +150,31 @@ const AGENTS = [
     stats: { callsToday: 76 },
   },
   {
-    id: 'ingest', name: 'Ingest',
-    role: 'Memory Classifier',
+    id: 'image_describer', name: 'Image Describer',
+    role: 'Vision Caption Worker',
     gradient: [C.grey600, C.grey900],
     x: 321, y: 638, status: 'online',
-    description: 'Phân loại và lưu memory sau mỗi hội thoại. Tier: CORE → IMPORTANT → DETAIL → NOISE.',
+    description: 'Background per-turn worker. Sau khi orchestrator trả lời, gọi Gemini Flash vision để mô tả ảnh thành text tiếng Việt (~30-60 từ), rồi thay bytes trong cache bằng text. Bytes KHÔNG BAO GIỜ chạm Turso.',
     capabilities: [
-      'Phân tier memory (CORE/IMPORTANT/DETAIL/NOISE)',
-      'Trích xuất entities & topics',
-      'Lưu memory vào Turso',
+      'Vision caption qua Gemini 2.5 Flash',
+      'Replace image bytes → text trong cache',
+      'Concurrent describe nhiều ảnh / turn',
+      'Fallback "không thể mô tả ảnh" khi fail',
+    ],
+    config: { apiKey: '', model: 'gemini-2.5-flash' },
+    toolsCount: 0,
+    stats: { callsToday: 24 },
+  },
+  {
+    id: 'topic_classifier', name: 'Topic Classifier',
+    role: 'Task Classifier (background)',
+    gradient: [C.grey700, C.grey900],
+    x: 575, y: 638, status: 'online',
+    description: 'Background per-turn worker. Phân loại mỗi lượt chat thành topic + flag is_task để hiển thị Task Pipeline. Chạy sau khi orchestrator trả lời, ghi kết quả vào bảng tasks (Turso).',
+    capabilities: [
+      'Phân loại topic của message + reply',
+      'Flag is_task để Task Pipeline hiển thị',
+      'Finalize classification trên bảng tasks',
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
     toolsCount: 0,
@@ -165,13 +182,14 @@ const AGENTS = [
   },
   {
     id: 'consolidate', name: 'Consolidate',
-    role: 'Memory Compactor',
+    role: 'Memory Compactor (24h cron)',
     gradient: [C.secondary200, C.secondary800],
     x: 1079, y: 638, status: 'idle',
-    description: 'Gộp raw memories thành consolidated summaries, xóa duplicates, giữ entities quan trọng. Trigger: APScheduler mỗi 24h.',
+    description: 'Cron 24h. Đọc raw_message từ memories table (đã flush từ cache khi evict), 1 LLM call để extract + nén thành nhiều consolidated summary (mỗi entity/topic 1 row), lưu vào consolidated_memories rồi xoá source rows.',
     capabilities: [
-      'Gộp raw memories → summaries',
-      'Khử trùng lặp entities',
+      'Đọc memories raw → extract + nén bằng 1 LLM call',
+      'Tạo nhiều consolidated summary / user / lần chạy',
+      'Xoá source rows sau khi consolidate thành công',
       'Trigger định kỳ qua APScheduler',
     ],
     config: { apiKey: '', model: 'gemini-2.5-flash' },
@@ -353,14 +371,26 @@ const INFRA = [
     x: 1212, y: 278, r: 28, grad: [C.grey600, C.grey900], icon: 'google', shared: true,
   },
   {
+    id: 'cache', name: 'Conversation Cache', sub: 'RAM (in-process)',
+    role: 'Phiên hiện tại — single source of truth',
+    description: 'In-process dict trong AiAgent-service. Lưu messages của phiên hiện tại (text + image bytes), TTL 30 phút từ last_access. Không bao giờ ghi per-turn vào Turso. Khi cleanup_expired_with_flush chạy (5 phút/lần), các session quá hạn được flush sang memories rồi GC.',
+    config: {
+      ttlMinutes: 30,
+      cleanupIntervalMin: 5,
+      flushOnEviction: 'true',
+      imageBytesLifetime: 'until describe_image done',
+    },
+    x: 460, y: 705, r: 28, grad: [C.grey500, C.grey700], icon: 'cache', shared: false,
+  },
+  {
     id: 'turso', name: 'Memory Store', sub: 'Turso / libSQL',
-    role: 'Persistent conversation memory',
-    description: 'Lưu memories đã phân tier (CORE/IMPORTANT/DETAIL/NOISE) và consolidated summaries. Truy xuất trong mọi conversation.',
+    role: 'Persistent storage (raw + consolidated + tasks + files)',
+    description: '4 bảng: memories (raw_message từ phiên đã evict, chưa nén), consolidated_memories (long-term sau 24h consolidate), tasks (Task Pipeline log), files (registry document Qdrant). Image bytes KHÔNG BAO GIỜ chạm Turso — chỉ text mô tả.',
     config: {
       dbUrl: 'libsql://siupo-memory.turso.io',
       authToken: '••••••••••••',
-      ttlDays: 30,
-      maxMemoriesPerUser: 1000,
+      tables: 'memories, consolidated_memories, tasks, files',
+      consolidateEveryHours: 24,
     },
     x: 700, y: 705, r: 28, grad: [C.grey700, C.grey900], icon: 'db', shared: false,
   },
@@ -374,58 +404,62 @@ const CHANNELS = [
 const SCHEDULER_NODE = {
   id: 'scheduler',
   name: 'APScheduler',
-  role: 'Trigger định kỳ cho Consolidate agent',
-  description: 'Background scheduler chạy bên trong AiAgent-service (FastAPI lifespan). Kích hoạt Consolidate agent theo chu kỳ để gộp raw memories thành consolidated summaries trong Turso.',
+  role: 'Trigger định kỳ — 2 jobs (consolidate 24h + cache cleanup 5m)',
+  description: 'Background scheduler chạy bên trong AiAgent-service (FastAPI lifespan). Quản lý 2 cron job: consolidate_agent_job (24h gộp memories raw) và cache_cleanup_job (5 phút quét cache TTL hết hạn → flush sang Turso qua callback bulk_save_memories).',
   capabilities: [
-    'Kích hoạt run_consolidate_agent mỗi N giờ',
-    'Replace_existing job để tránh duplicate',
+    'Kích hoạt run_consolidate_agent mỗi 24h',
+    'Kích hoạt cleanup_expired_with_flush mỗi 5 phút',
+    'Đăng ký flush callback lúc startup',
     'Tự dừng khi FastAPI shutdown',
   ],
   config: {
     intervalHours: 24,
-    jobId: 'consolidate_agent_job',
+    cacheCleanupMinutes: 5,
+    consolidateJobId: 'consolidate_agent_job',
+    cacheCleanupJobId: 'cache_cleanup_job',
     triggerType: 'interval',
-    target: 'consolidate_agent',
   },
   x: 1265, y: 612, r: 19,
   gradient: [C.warningDark, C.warningMain],
 };
 
 const CONNECTIONS = [
-  { from: 'orchestrator', to: 'analytics',        type: 'primary',   fR: 52, tR: 52 },
-  { from: 'orchestrator', to: 'management',       type: 'primary',   fR: 52, tR: 52 },
-  { from: 'orchestrator', to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'analytics',    to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'management',   to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'orchestrator', to: 'google',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'analytics',    to: 'google',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'management',   to: 'google',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'analytics',    to: 'tools_analytics',  type: 'tools',     fR: 52, tR: 34 },
-  { from: 'management',   to: 'tools_management', type: 'tools',     fR: 52, tR: 34 },
-  { from: 'orchestrator', to: 'turso',            type: 'secondary', fR: 52, tR: 28 },
-  { from: 'ingest',       to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
-  { from: 'consolidate',  to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
-  { from: 'scheduler',    to: 'consolidate',      type: 'scheduled', fR: 19, tR: 52 },
-  { from: 'zalo',         to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
-  { from: 'gmail',        to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
+  // Sub-agent delegation (function calling)
+  { from: 'orchestrator',     to: 'analytics',        type: 'primary',   fR: 52, tR: 52 },
+  { from: 'orchestrator',     to: 'management',       type: 'primary',   fR: 52, tR: 52 },
+  // Tool bundles
+  { from: 'analytics',        to: 'tools_analytics',  type: 'tools',     fR: 52, tR: 34 },
+  { from: 'management',       to: 'tools_management', type: 'tools',     fR: 52, tR: 34 },
+  // RAG + Web search (orchestrator + sub-agents có quyền search_documents/search_internet)
+  { from: 'orchestrator',     to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'analytics',        to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'management',       to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'orchestrator',     to: 'google',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'analytics',        to: 'google',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'management',       to: 'google',           type: 'infra',     fR: 52, tR: 28 },
+  // Memory reads per turn
+  { from: 'orchestrator',     to: 'cache',            type: 'secondary', fR: 52, tR: 28 },
+  { from: 'orchestrator',     to: 'turso',            type: 'secondary', fR: 52, tR: 28 },
+  // Background per-turn workers (fork from orchestrator)
+  { from: 'orchestrator',     to: 'image_describer',  type: 'infra',     fR: 52, tR: 52 },
+  { from: 'orchestrator',     to: 'topic_classifier', type: 'infra',     fR: 52, tR: 52 },
+  { from: 'image_describer',  to: 'cache',            type: 'infra',     fR: 52, tR: 28 },
+  { from: 'topic_classifier', to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
+  // Cache flush + consolidate
+  { from: 'cache',            to: 'turso',            type: 'infra',     fR: 28, tR: 28 },
+  { from: 'consolidate',      to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
+  // Scheduler triggers (2 jobs)
+  { from: 'scheduler',        to: 'consolidate',      type: 'scheduled', fR: 19, tR: 52 },
+  { from: 'scheduler',        to: 'cache',            type: 'scheduled', fR: 19, tR: 28 },
+  // Future channels
+  { from: 'zalo',             to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
+  { from: 'gmail',            to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
 ];
 
 const NODE_MAP = {};
 [...AGENTS, ...INFRA, ...TOOL_BUNDLES, ...CHANNELS, SCHEDULER_NODE].forEach((n) => {
   NODE_MAP[n.id] = n;
 });
-
-// Mock activity flows — only edges in active flow animate
-const MOCK_FLOWS = [
-  { name: 'Analytics query',     edges: ['orchestrator>analytics',  'analytics>tools_analytics'],  duration: 2400 },
-  { name: 'Management CRUD',     edges: ['orchestrator>management', 'management>tools_management'], duration: 2400 },
-  { name: 'RAG document search', edges: ['orchestrator>qdrant'],                                    duration: 1600 },
-  { name: 'Web search',          edges: ['orchestrator>google'],                                    duration: 1600 },
-  { name: 'Memory read',         edges: ['orchestrator>turso'],                                     duration: 1400 },
-  { name: 'Memory ingest',       edges: ['ingest>turso'],                                           duration: 1400 },
-  { name: 'Analytics + RAG',     edges: ['orchestrator>analytics', 'analytics>qdrant', 'analytics>tools_analytics'], duration: 2800 },
-  { name: 'Mgmt + memory write', edges: ['orchestrator>management', 'management>tools_management', 'ingest>turso'],  duration: 2800 },
-];
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 function AgentIcon({ id }) {
@@ -459,14 +493,35 @@ function AgentIcon({ id }) {
         <polyline points="-6,5 -2,9 6,2" fill="none" stroke={w} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </g>
     );
-    case 'ingest': return (
+    case 'image_describer': return (
       <g>
-        <path d="M-11,-9 L11,-9 L5,2 L3.5,10 L-3.5,10 L-5,2 Z" fill="none" stroke={w} strokeWidth="1.5" strokeLinejoin="round" />
-        <line x1="-7" y1="-5" x2="7" y2="-5" stroke={m} strokeWidth="1.2" strokeLinecap="round" />
-        <line x1="-3.5" y1="-1" x2="3.5" y2="-1" stroke={s} strokeWidth="1.2" strokeLinecap="round" />
-        <circle cx="-7" cy="-12" r="1.8" fill={m} /><circle cx="0" cy="-12.5" r="2" fill={w} /><circle cx="7" cy="-12" r="1.8" fill={m} />
-        <line x1="0" y1="10" x2="0" y2="13" stroke={w} strokeWidth="2" strokeLinecap="round" />
-        <polygon points="-2.5,12 2.5,12 0,15" fill={w} />
+        {/* camera body */}
+        <rect x="-12" y="-6" width="24" height="16" rx="2.5" fill="none" stroke={w} strokeWidth="1.5" />
+        {/* viewfinder bump */}
+        <rect x="-5" y="-9" width="10" height="3.5" rx="1" fill={m} />
+        {/* lens outer */}
+        <circle cx="0" cy="2.5" r="5" fill="none" stroke={w} strokeWidth="1.5" />
+        {/* lens inner */}
+        <circle cx="0" cy="2.5" r="2" fill={w} />
+        {/* indicator dot */}
+        <circle cx="-8.5" cy="-2.5" r="1.2" fill={s} />
+        {/* spark above — caption sparkle */}
+        <line x1="-12" y1="-12" x2="-8" y2="-12" stroke={m} strokeWidth="1.2" strokeLinecap="round" />
+        <line x1="-10" y1="-14" x2="-10" y2="-10" stroke={m} strokeWidth="1.2" strokeLinecap="round" />
+      </g>
+    );
+    case 'topic_classifier': return (
+      <g>
+        {/* tag shape */}
+        <path d="M-11,-3 L-3,-11 L11,-11 L11,3 L3,11 L-11,-3 Z"
+          fill="none" stroke={w} strokeWidth="1.5" strokeLinejoin="round" />
+        {/* tag hole */}
+        <circle cx="6" cy="-6" r="2" fill="none" stroke={w} strokeWidth="1.3" />
+        {/* checkmark inside */}
+        <polyline points="-6,0 -2,4 5,-3" fill="none" stroke={w} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        {/* small dots = labels */}
+        <circle cx="-9" cy="6" r="1.2" fill={m} />
+        <circle cx="-5" cy="9" r="1.2" fill={s} />
       </g>
     );
     case 'consolidate': return (
@@ -510,14 +565,29 @@ function InfraIcon({ type }) {
         <ellipse cx="0" cy="0" rx="9" ry="3" fill="none" stroke={m} strokeWidth="1" />
       </g>
     );
+    case 'cache': return (
+      <g>
+        {/* RAM stick body */}
+        <rect x="-10" y="-6" width="20" height="11" rx="1" fill="none" stroke={w} strokeWidth="1.4" />
+        {/* chips */}
+        <rect x="-8.5" y="-4.5" width="4.5" height="8" rx="0.6" fill={m} />
+        <rect x="-2.25" y="-4.5" width="4.5" height="8" rx="0.6" fill={w} />
+        <rect x="4" y="-4.5" width="4.5" height="8" rx="0.6" fill={m} />
+        {/* connector pins */}
+        <line x1="-8" y1="6" x2="-8" y2="9" stroke={w} strokeWidth="1.2" strokeLinecap="round" />
+        <line x1="-3" y1="6" x2="-3" y2="9" stroke={w} strokeWidth="1.2" strokeLinecap="round" />
+        <line x1="3" y1="6" x2="3" y2="9" stroke={w} strokeWidth="1.2" strokeLinecap="round" />
+        <line x1="8" y1="6" x2="8" y2="9" stroke={w} strokeWidth="1.2" strokeLinecap="round" />
+      </g>
+    );
     default: return null;
   }
 }
 
 // ── Status ring ───────────────────────────────────────────────────────────────
 const STATUS_CFG = {
-  online: { r1: { dash: '16 6', w: 2.5, dur: '9s',   dir: 1, op: 0.75 }, r2: null },
-  task:   { r1: { dash: '10 4', w: 3,   dur: '1.8s', dir: 1, op: 0.92 }, r2: { dash: '4 10', w: 1.5, dr: 8, dur: '1.2s', dir: -1, op: 0.45 } },
+  online: { r1: { dash: '16 6', w: 2.5, dur: '4.5s', dir: 1, op: 0.85 }, r2: null },
+  task:   { r1: { dash: '10 4', w: 3,   dur: '1.2s', dir: 1, op: 0.95 }, r2: { dash: '4 10', w: 1.5, dr: 8, dur: '0.9s', dir: -1, op: 0.55 } },
   idle:   { r1: { dash: '4 12', w: 1.5, dur: null,   dir: 0, op: 0.32 }, r2: null },
   error:  { r1: { dash: '22 4', w: 2.5, dur: null,   dir: 0, op: 0.80 }, r2: null },
 };
@@ -754,7 +824,7 @@ function SchedulerNode({ node, isHovered, onHover, onLeave, onClick }) {
       <line x1={node.x} y1={node.y} x2={node.x + node.r - 7} y2={node.y} stroke={amber} strokeWidth="1.3" strokeLinecap="round" style={{ pointerEvents: 'none' }} />
       <circle cx={node.x} cy={node.y} r="1.8" fill={amber} style={{ pointerEvents: 'none' }} />
       <text x={node.x} y={node.y + node.r + 13} textAnchor="middle" fill={amber} fontSize="7.5" fontWeight="700" fontFamily="'Roboto Mono',monospace" style={{ pointerEvents: 'none' }}>
-        {node.config?.intervalHours || 24}h
+        {node.config?.intervalHours || 24}h · {node.config?.cacheCleanupMinutes || 5}m
       </text>
     </g>
   );
@@ -1093,7 +1163,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
               ))}
             </Box>
             <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary', mt: 1.2, fontStyle: 'italic' }}>
-              Interval cấu hình qua env var <code>CONSOLIDATE_INTERVAL_HOURS</code> trên AiAgent-service.
+              Interval cấu hình qua env vars <code>CONSOLIDATE_INTERVAL_HOURS</code> và <code>CACHE_CLEANUP_INTERVAL_MINUTES</code> trên AiAgent-service.
             </Typography>
           </Box>
         ) : Object.keys(draft).length > 0 && (
@@ -1201,26 +1271,10 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
 export default function AgentDiagram() {
   const theme = useTheme();
   const [hoveredId,    setHoveredId]    = useState(null);  // any node id (agent / infra / bundle)
-  const [activeFlow,   setActiveFlow]   = useState(null);
   const [dialogTarget, setDialogTarget] = useState(null);  // { node, kind } | null
 
-  // Mock activity flow cycling
-  useEffect(() => {
-    let cancelled = false;
-    let timer;
-    const cycle = () => {
-      if (cancelled) return;
-      const flow = MOCK_FLOWS[Math.floor(Math.random() * MOCK_FLOWS.length)];
-      setActiveFlow(flow);
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        setActiveFlow(null);
-        timer = setTimeout(cycle, 1400 + Math.random() * 2200);
-      }, flow.duration);
-    };
-    timer = setTimeout(cycle, 800);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
+  // Live telemetry from BE event bus (SSE).
+  const { agentStatusMap, activeEdges, connected, taskCount } = useAgentEventStream();
 
   // Resolve "active" agent for connection highlighting:
   // - hovering an agent → that agent
@@ -1240,18 +1294,7 @@ export default function AgentDiagram() {
         || conn.from === activeAgent || conn.to === activeAgent;
   };
 
-  const isEdgeHot = (conn) => {
-    if (!activeFlow) return false;
-    return activeFlow.edges.includes(`${conn.from}>${conn.to}`);
-  };
-
-  const isAgentInFlow = (agentId) => {
-    if (!activeFlow) return false;
-    return activeFlow.edges.some((e) => {
-      const [from, to] = e.split('>');
-      return from === agentId || to === agentId;
-    });
-  };
+  const isEdgeHot = (conn) => activeEdges.has(`${conn.from}>${conn.to}`);
 
   const isInfraLinked = (infraId) =>
     !!activeAgent && CONNECTIONS.some(
@@ -1305,17 +1348,28 @@ export default function AgentDiagram() {
           BACKGROUND TIER
         </text>
 
-        {activeFlow && (
-          <g style={{ pointerEvents: 'none' }}>
-            <rect x={1170} y={14} width={216} height={22} rx={11} fill={alpha(C.successDark, 0.15)} stroke={alpha(C.successDark, 0.45)} strokeWidth="1" />
-            <circle cx={1186} cy={25} r={3.5} fill={C.successDark}>
-              <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
-            </circle>
-            <text x={1196} y={29} fill={C.successDark} fontSize="9" fontWeight="700" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3">
-              {activeFlow.name.toUpperCase()}
-            </text>
-          </g>
-        )}
+        {/* Live connection indicator */}
+        {(() => {
+          const accent = connected ? C.successDark : C.warningDark;
+          const label = connected
+            ? (taskCount > 0 ? `LIVE · ${taskCount} TASK${taskCount > 1 ? 'S' : ''}` : 'LIVE')
+            : 'RECONNECTING…';
+          return (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={1170} y={14} width={216} height={22} rx={11}
+                fill={alpha(accent, 0.15)} stroke={alpha(accent, 0.45)} strokeWidth="1" />
+              <circle cx={1186} cy={25} r={3.5} fill={accent}>
+                {connected && (
+                  <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
+                )}
+              </circle>
+              <text x={1196} y={29} fill={accent} fontSize="9" fontWeight="700"
+                fontFamily="'Roboto Mono',monospace" letterSpacing="0.3">
+                {label}
+              </text>
+            </g>
+          );
+        })()}
 
         {/* Connections */}
         {CONNECTIONS.map((conn, i) => {
@@ -1394,26 +1448,29 @@ export default function AgentDiagram() {
           </g>
         </Tooltip>
 
-        {/* Agent nodes */}
-        {AGENTS.map((agent) => (
-          <Tooltip
-            key={agent.id}
-            title={<NodeTooltipContent name={agent.name} role={agent.role} status={agent.status} configKeys={Object.keys(agent.config || {})} />}
-            placement="top" arrow enterDelay={150} leaveDelay={50}
-            componentsProps={{ tooltip: { sx: tooltipSx } }}
-          >
-            <g>
-              <AgentNode
-                agent={agent}
-                isHovered={hoveredId === agent.id}
-                isInFlow={isAgentInFlow(agent.id)}
-                onHover={() => setHoveredId(agent.id)}
-                onLeave={() => setHoveredId(null)}
-                onClick={() => openDialog(agent, 'agent')}
-              />
-            </g>
-          </Tooltip>
-        ))}
+        {/* Agent nodes — status comes from live event stream, default 'idle' */}
+        {AGENTS.map((agent) => {
+          const liveAgent = { ...agent, status: agentStatusMap[agent.id] || 'idle' };
+          return (
+            <Tooltip
+              key={agent.id}
+              title={<NodeTooltipContent name={liveAgent.name} role={liveAgent.role} status={liveAgent.status} configKeys={Object.keys(liveAgent.config || {})} />}
+              placement="top" arrow enterDelay={150} leaveDelay={50}
+              componentsProps={{ tooltip: { sx: tooltipSx } }}
+            >
+              <g>
+                <AgentNode
+                  agent={liveAgent}
+                  isHovered={hoveredId === agent.id}
+                  isInFlow={false}
+                  onHover={() => setHoveredId(agent.id)}
+                  onLeave={() => setHoveredId(null)}
+                  onClick={() => openDialog(liveAgent, 'agent')}
+                />
+              </g>
+            </Tooltip>
+          );
+        })}
 
         {/* SHARED markers on Qdrant & Google */}
         <text x={188} y={248} textAnchor="middle" fill={alpha(C.grey700, 0.65)} fontSize="6.5" fontFamily="'Roboto Mono',monospace" letterSpacing="0.3" style={{ pointerEvents: 'none' }}>

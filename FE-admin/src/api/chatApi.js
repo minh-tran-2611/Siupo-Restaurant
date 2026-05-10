@@ -11,7 +11,10 @@ const aiAgentClient = axios.create({
 const chatApi = {
   /**
    * Gửi tin nhắn đến AI Agent (FastAPI)
-   * @param {Object} data - { userId: string, message: string }
+   * @param {Object} data
+   * @param {string} data.userId
+   * @param {string} data.message
+   * @param {Array<{ data: string, mime: string }>} [data.images] - base64-encoded image attachments (session-only, không lưu DB)
    * @returns {Promise<{ reply: string }>}
    */
   sendMessage: (data) => aiAgentClient.post('/chat', data).then((res) => res.data),

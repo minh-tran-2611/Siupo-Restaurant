@@ -10,20 +10,49 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 import Grow from '@mui/material/Grow';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import Chip from '@mui/material/Chip';
 import { useTheme, alpha } from '@mui/material/styles';
 
 // icons
-import { IconMessageCircle, IconSend, IconX, IconRobot, IconUser, IconSparkles } from '@tabler/icons-react';
+import {
+  IconMessageCircle,
+  IconSend,
+  IconX,
+  IconRobot,
+  IconUser,
+  IconSparkles,
+  IconPaperclip,
+  IconFile,
+  IconPhoto,
+  IconUpload
+} from '@tabler/icons-react';
 
 // project imports
 import chatApi from 'api/chatApi';
+import fileApi from 'api/fileApi';
 
 // ==============================|| AI CHATBOX ||============================== //
+
+const ATTACHMENT_ACCEPT = '.md,.txt,.pdf,.docx,.json,.csv,.jpg,.jpeg,.png,.gif,.webp';
+const MAX_ATTACHMENTS = 5;
+
+function attachmentIcon(mime = '') {
+  return mime.startsWith('image/') ? IconPhoto : IconFile;
+}
+
+function shortName(name, max = 24) {
+  if (!name || name.length <= max) return name;
+  const dot = name.lastIndexOf('.');
+  const ext = dot > -1 ? name.slice(dot) : '';
+  const base = dot > -1 ? name.slice(0, dot) : name;
+  return base.slice(0, max - ext.length - 1) + '…' + ext;
+}
 
 export default function ChatBox() {
   const theme = useTheme();
@@ -34,10 +63,20 @@ export default function ChatBox() {
   const [loading, setLoading] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
 
+  // Attachments:
+  //   { localId, file, name, mime, size, kind: 'image'|'doc',
+  //     status: 'uploading'|'done'|'error',
+  //     remote?  (doc only — server file metadata),
+  //     data?    (image only — base64 string),
+  //     error? }
+  const [attachments, setAttachments] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Get userId from localStorage
   const getUserId = () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -48,7 +87,6 @@ export default function ChatBox() {
     }
   };
 
-  // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -57,7 +95,6 @@ export default function ChatBox() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Focus input when chat opens
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 300);
@@ -65,62 +102,209 @@ export default function ChatBox() {
     }
   }, [open]);
 
-  const handleToggle = () => {
-    setOpen((prev) => !prev);
+  // Ctrl+Shift+S to open file picker (only when chat is open)
+  useEffect(() => {
+    const handler = (e) => {
+      if (!open) return;
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        fileInputRef.current?.click();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  // ── Attachment helpers ──────────────────────────────────────────────
+  // Images: read as base64 inline, kept in cache for the session only.
+  // Documents: uploaded to /files endpoint (Qdrant-indexed).
+  const readAsBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        const idx = result.indexOf('base64,');
+        resolve(idx >= 0 ? result.slice(idx + 7) : '');
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const processImage = useCallback(async (localId, file) => {
+    try {
+      const data = await readAsBase64(file);
+      setAttachments((prev) =>
+        prev.map((a) => (a.localId === localId ? { ...a, status: 'done', data } : a))
+      );
+    } catch (e) {
+      setAttachments((prev) =>
+        prev.map((a) =>
+          a.localId === localId ? { ...a, status: 'error', error: e?.message || 'Read failed' } : a
+        )
+      );
+    }
+  }, []);
+
+  const uploadDocument = useCallback(async (localId, file) => {
+    try {
+      const res = await fileApi.uploadFile({ file, description: 'Đính kèm từ chat' });
+      setAttachments((prev) =>
+        prev.map((a) => (a.localId === localId ? { ...a, status: 'done', remote: res.file } : a))
+      );
+    } catch (e) {
+      const msg = e?.response?.data?.detail || e?.message || 'Upload failed';
+      setAttachments((prev) =>
+        prev.map((a) => (a.localId === localId ? { ...a, status: 'error', error: msg } : a))
+      );
+    }
+  }, []);
+
+  const handleAddFiles = useCallback(
+    (files) => {
+      if (!files || !files.length) return;
+      const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+      const toAdd = Array.from(files).slice(0, remainingSlots);
+
+      toAdd.forEach((file) => {
+        const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const isImage = (file.type || '').startsWith('image/');
+        const item = {
+          localId,
+          file,
+          name: file.name,
+          mime: file.type,
+          size: file.size,
+          kind: isImage ? 'image' : 'doc',
+          status: 'uploading'
+        };
+        setAttachments((prev) => [...prev, item]);
+        if (isImage) {
+          processImage(localId, file);
+        } else {
+          uploadDocument(localId, file);
+        }
+      });
+    },
+    [attachments.length, processImage, uploadDocument]
+  );
+
+  const removeAttachment = (localId) => {
+    setAttachments((prev) => prev.filter((a) => a.localId !== localId));
   };
 
-  const handleClose = () => {
-    setOpen(false);
+  // ── Drag & drop on chat window ──────────────────────────────────────
+  const onDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.types?.includes('Files')) {
+      dragCounter.current += 1;
+      setIsDragging(true);
+    }
   };
+  const onDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setIsDragging(false);
+  };
+  const onDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const onDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    if (e.dataTransfer?.files?.length) {
+      handleAddFiles(e.dataTransfer.files);
+    }
+  };
+
+  // ── Paste image from clipboard ───────────────────────────────────────
+  const onPaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imgs = [];
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imgs.push(file);
+      }
+    }
+    if (imgs.length) {
+      e.preventDefault();
+      handleAddFiles(imgs);
+    }
+  };
+
+  // ── Send ─────────────────────────────────────────────────────────────
+  // Documents: prefix filenames into the message text (agent sees them via RAG).
+  // Images: passed inline as base64 — kept session-only on the server.
+  const buildMessageWithDocs = (text, readyDocs) => {
+    if (!readyDocs.length) return text;
+    const lines = readyDocs.map((a) => `- ${a.remote?.filename || a.name}`).join('\n');
+    return `[Đính kèm:\n${lines}\n]\n\n${text}`;
+  };
+
+  const handleToggle = () => setOpen((prev) => !prev);
+  const handleClose = () => setOpen(false);
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    const ready = attachments.filter((a) => a.status === 'done');
+    const stillUploading = attachments.some((a) => a.status === 'uploading');
 
-    // Add user message
+    if (stillUploading) return; // wait for uploads
+    if (!trimmed && !ready.length) return;
+    if (loading) return;
+
+    const readyDocs = ready.filter((a) => a.kind === 'doc');
+    const readyImages = ready.filter((a) => a.kind === 'image');
+
+    const baseText = trimmed || 'Hãy phân tích / tư vấn dựa trên file đính kèm.';
+    const finalMessage = buildMessageWithDocs(baseText, readyDocs);
+
     const userMessage = {
       id: Date.now(),
       type: 'user',
       content: trimmed,
+      attachments: ready.map((a) => ({ name: a.remote?.filename || a.name, mime: a.mime })),
       timestamp: new Date()
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setAttachments([]);
     setLoading(true);
 
     try {
-      const payload = {
+      const res = await chatApi.sendMessage({
         userId: getUserId(),
-        message: trimmed
-      };
-      console.log('Sending chat payload:', payload);
-      const res = await chatApi.sendMessage(payload);
+        message: finalMessage,
+        images: readyImages.map((a) => ({ data: a.data, mime: a.mime }))
+      });
 
-      // Add AI response
       const aiMessage = {
         id: Date.now() + 1,
         type: 'ai',
         content: res.reply,
         timestamp: new Date()
       };
-
       setMessages((prev) => [...prev, aiMessage]);
-
-      if (!open) {
-        setHasNewMessage(true);
-      }
+      if (!open) setHasNewMessage(true);
     } catch (error) {
-      console.error('Chat error:', error.response?.data || error.message);
       const errorDetail = error.response?.data?.detail || 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
-      const errorMessage = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: `Xin lỗi, ${typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail)}`,
-        timestamp: new Date(),
-        isError: true
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          type: 'ai',
+          content: `Xin lỗi, ${typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail)}`,
+          timestamp: new Date(),
+          isError: true
+        }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -135,7 +319,7 @@ export default function ChatBox() {
 
   const handleNewChat = async () => {
     setMessages([]);
-    // Clear conversation history on backend
+    setAttachments([]);
     try {
       await chatApi.clearHistory(getUserId());
     } catch (error) {
@@ -143,12 +327,13 @@ export default function ChatBox() {
     }
   };
 
-  const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatTime = (date) =>
+    new Date(date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  const sendDisabled =
+    loading ||
+    attachments.some((a) => a.status === 'uploading') ||
+    (!input.trim() && !attachments.some((a) => a.status === 'done'));
 
   return (
     <>
@@ -156,13 +341,17 @@ export default function ChatBox() {
       <Grow in={open} style={{ transformOrigin: 'bottom right' }}>
         <Paper
           elevation={16}
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
           sx={{
             position: 'fixed',
             bottom: 96,
             right: 24,
             width: { xs: 'calc(100vw - 32px)', sm: 400 },
-            height: { xs: 'calc(100vh - 140px)', sm: 520 },
-            maxHeight: '80vh',
+            height: { xs: 'calc(100vh - 140px)', sm: 540 },
+            maxHeight: '85vh',
             display: open ? 'flex' : 'none',
             flexDirection: 'column',
             borderRadius: 3,
@@ -171,6 +360,35 @@ export default function ChatBox() {
             border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
           }}
         >
+          {/* Drag overlay */}
+          {isDragging && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: alpha(theme.palette.primary.main, 0.92),
+                color: '#fff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+                pointerEvents: 'none',
+                border: `2px dashed ${alpha('#fff', 0.6)}`,
+                m: 0.5,
+                borderRadius: 2.5
+              }}
+            >
+              <IconUpload size={48} />
+              <Typography variant="h5" sx={{ color: '#fff', mt: 1.5 }}>
+                Thả file để đính kèm
+              </Typography>
+              <Typography variant="caption" sx={{ color: alpha('#fff', 0.85), mt: 0.5 }}>
+                .md .txt .pdf .docx .png .jpg — tối đa {MAX_ATTACHMENTS} file
+              </Typography>
+            </Box>
+          )}
+
           {/* Header */}
           <Box
             sx={{
@@ -184,13 +402,7 @@ export default function ChatBox() {
               minHeight: 60
             }}
           >
-            <Avatar
-              sx={{
-                bgcolor: alpha('#fff', 0.2),
-                width: 36,
-                height: 36
-              }}
-            >
+            <Avatar sx={{ bgcolor: alpha('#fff', 0.2), width: 36, height: 36 }}>
               <IconRobot size={22} />
             </Avatar>
             <Box sx={{ flex: 1 }}>
@@ -198,7 +410,7 @@ export default function ChatBox() {
                 AI Assistant
               </Typography>
               <Typography variant="caption" sx={{ color: alpha('#fff', 0.8) }}>
-                {loading ? 'Đang nhập...' : 'Trực tuyến'}
+                {loading ? 'Đang nhập...' : 'Trực tuyến · Ctrl+Shift+S để đính kèm'}
               </Typography>
             </Box>
             <Tooltip title="Cuộc hội thoại mới">
@@ -221,22 +433,15 @@ export default function ChatBox() {
               display: 'flex',
               flexDirection: 'column',
               gap: 1.5,
-              '&::-webkit-scrollbar': {
-                width: 6
-              },
-              '&::-webkit-scrollbar-track': {
-                bgcolor: 'transparent'
-              },
+              '&::-webkit-scrollbar': { width: 6 },
+              '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
               '&::-webkit-scrollbar-thumb': {
                 bgcolor: alpha(theme.palette.primary.main, 0.2),
                 borderRadius: 3,
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.4)
-                }
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.4) }
               }
             }}
           >
-            {/* Welcome message */}
             {messages.length === 0 && (
               <Box
                 sx={{
@@ -261,16 +466,15 @@ export default function ChatBox() {
                 </Avatar>
                 <Box sx={{ textAlign: 'center', px: 2 }}>
                   <Typography variant="h5" sx={{ color: theme.palette.grey[700], mb: 0.5 }}>
-                    Xin chào! 
+                    Xin chào!
                   </Typography>
                   <Typography variant="body2" sx={{ color: theme.palette.grey[500], lineHeight: 1.6 }}>
-                    Tôi là trợ lý AI của hệ thống. Hãy hỏi tôi bất cứ điều gì về quản lý nhà hàng, đơn hàng, sản phẩm...
+                    Hỏi tôi về quản lý nhà hàng, hoặc kéo-thả file (CV, báo cáo, policy...) để xin tư vấn.
                   </Typography>
                 </Box>
               </Box>
             )}
 
-            {/* Message Bubbles */}
             {messages.map((msg) => (
               <Box
                 key={msg.id}
@@ -281,7 +485,6 @@ export default function ChatBox() {
                   flexDirection: msg.type === 'user' ? 'row-reverse' : 'row'
                 }}
               >
-                {/* Avatar */}
                 <Avatar
                   sx={{
                     width: 28,
@@ -293,7 +496,6 @@ export default function ChatBox() {
                   {msg.type === 'user' ? <IconUser size={16} /> : <IconRobot size={16} />}
                 </Avatar>
 
-                {/* Bubble */}
                 <Box
                   sx={{
                     maxWidth: '78%',
@@ -307,27 +509,52 @@ export default function ChatBox() {
                           ? alpha(theme.palette.error.main, 0.1)
                           : '#fff',
                     color:
-                      msg.type === 'user'
-                        ? '#fff'
-                        : msg.isError
-                          ? theme.palette.error.main
-                          : theme.palette.grey[800],
+                      msg.type === 'user' ? '#fff' : msg.isError ? theme.palette.error.main : theme.palette.grey[800],
                     boxShadow: msg.type === 'user' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
                     borderBottomRightRadius: msg.type === 'user' ? 4 : undefined,
                     borderBottomLeftRadius: msg.type === 'ai' ? 4 : undefined
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      lineHeight: 1.6,
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    {msg.content}
-                  </Typography>
+                  {/* Attachments inside user bubble */}
+                  {msg.attachments?.length > 0 && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: msg.content ? 0.75 : 0 }}>
+                      {msg.attachments.map((att, idx) => {
+                        const Icon = attachmentIcon(att.mime);
+                        return (
+                          <Box
+                            key={idx}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.75,
+                              px: 0.75,
+                              py: 0.5,
+                              borderRadius: 1,
+                              bgcolor: alpha('#fff', 0.18)
+                            }}
+                          >
+                            <Icon size={14} />
+                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#fff' }}>
+                              {shortName(att.name, 28)}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                  {msg.content && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.6,
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {msg.content}
+                    </Typography>
+                  )}
                   <Typography
                     variant="caption"
                     sx={{
@@ -344,17 +571,9 @@ export default function ChatBox() {
               </Box>
             ))}
 
-            {/* Typing indicator */}
             {loading && (
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-                <Avatar
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    bgcolor: theme.palette.primary.main,
-                    flexShrink: 0
-                  }}
-                >
+                <Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.primary.main, flexShrink: 0 }}>
                   <IconRobot size={16} />
                 </Avatar>
                 <Box
@@ -397,27 +616,119 @@ export default function ChatBox() {
 
           <Divider />
 
+          {/* Attachment chips */}
+          {attachments.length > 0 && (
+            <Box
+              sx={{
+                px: 1.25,
+                pt: 1,
+                pb: 0.5,
+                bgcolor: '#fff',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 0.5
+              }}
+            >
+              {attachments.map((a) => {
+                const Icon = attachmentIcon(a.mime);
+                const colorMap = {
+                  uploading: theme.palette.info.main,
+                  done: theme.palette.success.main,
+                  error: theme.palette.error.main
+                };
+                const c = colorMap[a.status];
+                return (
+                  <Tooltip
+                    key={a.localId}
+                    title={
+                      a.status === 'error'
+                        ? a.error
+                        : a.status === 'uploading'
+                          ? 'Đang upload...'
+                          : `${(a.size / 1024).toFixed(1)} KB`
+                    }
+                    arrow
+                  >
+                    <Chip
+                      icon={
+                        a.status === 'uploading' ? (
+                          <CircularProgress size={12} sx={{ color: c }} />
+                        ) : (
+                          <Icon size={14} color={c} />
+                        )
+                      }
+                      label={shortName(a.name, 22)}
+                      size="small"
+                      onDelete={() => removeAttachment(a.localId)}
+                      deleteIcon={<IconX size={12} />}
+                      sx={{
+                        height: 26,
+                        fontSize: '0.7rem',
+                        bgcolor: alpha(c, 0.08),
+                        color: c,
+                        border: `1px solid ${alpha(c, 0.3)}`,
+                        '& .MuiChip-deleteIcon': {
+                          color: c,
+                          '&:hover': { color: theme.palette.error.dark }
+                        }
+                      }}
+                    />
+                  </Tooltip>
+                );
+              })}
+            </Box>
+          )}
+
+          {/* Upload progress bar (visible while any uploading) */}
+          {attachments.some((a) => a.status === 'uploading') && (
+            <LinearProgress sx={{ height: 2 }} />
+          )}
+
           {/* Input Area */}
           <Box
             sx={{
               p: 1.5,
               bgcolor: '#fff',
               display: 'flex',
-              gap: 1,
+              gap: 0.5,
               alignItems: 'flex-end'
             }}
           >
+            <Tooltip title={`Đính kèm file (Ctrl+Shift+S)`} placement="top">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading || attachments.length >= MAX_ATTACHMENTS}
+                  sx={{ color: theme.palette.grey[600] }}
+                >
+                  <IconPaperclip size={18} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              multiple
+              accept={ATTACHMENT_ACCEPT}
+              onChange={(e) => {
+                handleAddFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
             <TextField
               inputRef={inputRef}
               fullWidth
               multiline
               maxRows={3}
-              placeholder="Nhập tin nhắn..."
+              placeholder="Nhập tin nhắn... (Ctrl+V để dán ảnh, kéo-thả file)"
               variant="outlined"
               size="small"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={onPaste}
               disabled={loading}
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -438,18 +749,16 @@ export default function ChatBox() {
                         size="small"
                         color="primary"
                         onClick={handleSend}
-                        disabled={!input.trim() || loading}
+                        disabled={sendDisabled}
                         sx={{
-                          bgcolor: input.trim() ? theme.palette.primary.main : 'transparent',
-                          color: input.trim() ? '#fff' : theme.palette.grey[400],
+                          bgcolor: !sendDisabled ? theme.palette.primary.main : 'transparent',
+                          color: !sendDisabled ? '#fff' : theme.palette.grey[400],
                           width: 32,
                           height: 32,
                           '&:hover': {
-                            bgcolor: input.trim() ? theme.palette.primary.dark : 'transparent'
+                            bgcolor: !sendDisabled ? theme.palette.primary.dark : 'transparent'
                           },
-                          '&.Mui-disabled': {
-                            color: theme.palette.grey[300]
-                          },
+                          '&.Mui-disabled': { color: theme.palette.grey[300] },
                           transition: 'all 0.2s'
                         }}
                       >
@@ -494,12 +803,7 @@ export default function ChatBox() {
               color="error"
               variant="dot"
               invisible={!hasNewMessage}
-              sx={{
-                '& .MuiBadge-badge': {
-                  top: 4,
-                  right: 4
-                }
-              }}
+              sx={{ '& .MuiBadge-badge': { top: 4, right: 4 } }}
             >
               {open ? <IconX size={24} /> : <IconMessageCircle size={24} />}
             </Badge>
