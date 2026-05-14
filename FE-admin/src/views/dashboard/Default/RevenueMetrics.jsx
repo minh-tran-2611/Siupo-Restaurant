@@ -64,7 +64,7 @@ export default function RevenueMetrics() {
             </Typography>
           </Box>
           <Typography variant="h3" sx={{ fontWeight: 700, color: '#1e88e5' }}>
-            ${(revenueData.averageOrderValue / 25000).toFixed(2)}
+            ${revenueData.averageOrderValue.toFixed(2)}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             AOV
@@ -86,7 +86,7 @@ export default function RevenueMetrics() {
             </Typography>
           </Box>
           <Typography variant="h3" sx={{ fontWeight: 700 }}>
-            ${(revenueData.todayRevenue / 25000).toFixed(2)}
+            ${revenueData.todayRevenue.toFixed(2)}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
             <Typography

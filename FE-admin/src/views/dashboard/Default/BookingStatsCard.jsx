@@ -5,42 +5,37 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import MainCard from 'ui-component/cards/MainCard';
-import managePlaceTable from '../../../api/managePlaceTable';
 import SkeletonTotalOrderCard from 'ui-component/cards/Skeleton/EarningCard';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import GroupIcon from '@mui/icons-material/Group';
 import TodayIcon from '@mui/icons-material/Today';
+import analyticsApi from '../../../api/analyticsApi';
 
 export default function BookingStatsCard({ isLoading: propIsLoading }) {
   const theme = useTheme();
-  const [stats, setStats] = useState(null);
-  const [todayCount, setTodayCount] = useState(0);
+  const [bookingData, setBookingData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchBookings = async () => {
       try {
         setLoading(true);
-        const s = await managePlaceTable.getBookingStatistics();
-        const today = await managePlaceTable.getTodayBookings();
-        setStats(s || {});
-        setTodayCount(Array.isArray(today) ? today.length : today?.count || 0);
+        const res = await analyticsApi.getBookings('THIS_MONTH');
+        if (res && res.data) {
+          setBookingData(res.data);
+        }
       } catch (err) {
         console.error('Error fetching booking stats', err);
-        setStats({});
-        setTodayCount(0);
+        setBookingData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetch();
+    fetchBookings();
   }, []);
 
-  if (loading || propIsLoading) return <SkeletonTotalOrderCard />;
-
-  const guest = stats.guest || {};
-  const customer = stats.customer || {};
+  if (loading || propIsLoading || !bookingData) return <SkeletonTotalOrderCard />;
 
   return (
     <MainCard
@@ -94,7 +89,7 @@ export default function BookingStatsCard({ isLoading: propIsLoading }) {
               <Grid item xs={12} sm={4}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{(guest.total ?? 0).toLocaleString()}</Typography>
+                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{(bookingData.guestBookings ?? 0).toLocaleString()}</Typography>
                     <Avatar
                       sx={{
                         ...theme.typography.smallAvatar,
@@ -113,7 +108,7 @@ export default function BookingStatsCard({ isLoading: propIsLoading }) {
               <Grid item xs={12} sm={4}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{(customer.total ?? 0).toLocaleString()}</Typography>
+                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{(bookingData.customerBookings ?? 0).toLocaleString()}</Typography>
                     <Avatar
                       sx={{
                         ...theme.typography.smallAvatar,
@@ -132,7 +127,7 @@ export default function BookingStatsCard({ isLoading: propIsLoading }) {
               <Grid item xs={12} sm={4}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{todayCount.toLocaleString()}</Typography>
+                    <Typography sx={{ fontSize: '2.125rem', fontWeight: 500 }}>{(bookingData.todayBookings ?? 0).toLocaleString()}</Typography>
                     <Avatar
                       sx={{
                         ...theme.typography.smallAvatar,
@@ -153,3 +148,4 @@ export default function BookingStatsCard({ isLoading: propIsLoading }) {
     </MainCard>
   );
 }
+

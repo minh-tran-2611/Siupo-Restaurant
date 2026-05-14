@@ -266,21 +266,29 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public BookingAnalyticsResponse getBookingAnalytics(AnalyticsRequest request) {
         DateRange range = getDateRange(request);
         
-        // Get all customer bookings
+        // Get all customer bookings in date range
         List<com.siupo.restaurant.model.PlaceTableForCustomer> customerBookings = 
                 customerBookingRepository.findByDateRange(range.start, range.end);
         
-        // Get all guest bookings
+        // Get all guest bookings in date range
         List<com.siupo.restaurant.model.PlaceTableForGuest> guestBookings = 
                 guestBookingRepository.findByStartedAtBetween(range.start, range.end);
         
-        // Count by status for customer bookings
-        Long customerPending = customerBookingRepository.countByStatus(com.siupo.restaurant.enums.EPlaceTableStatus.PENDING);
-        Long customerConfirmed = customerBookingRepository.countByStatus(com.siupo.restaurant.enums.EPlaceTableStatus.CONFIRMED);
-        Long customerCompleted = customerBookingRepository.countByStatus(com.siupo.restaurant.enums.EPlaceTableStatus.COMPLETED);
-        Long customerDenied = customerBookingRepository.countByStatus(com.siupo.restaurant.enums.EPlaceTableStatus.DENIED);
+        // Count by status for customer bookings — from filtered list
+        Long customerPending = customerBookings.stream()
+                .filter(b -> b.getStatus() == com.siupo.restaurant.enums.EPlaceTableStatus.PENDING)
+                .count();
+        Long customerConfirmed = customerBookings.stream()
+                .filter(b -> b.getStatus() == com.siupo.restaurant.enums.EPlaceTableStatus.CONFIRMED)
+                .count();
+        Long customerCompleted = customerBookings.stream()
+                .filter(b -> b.getStatus() == com.siupo.restaurant.enums.EPlaceTableStatus.COMPLETED)
+                .count();
+        Long customerDenied = customerBookings.stream()
+                .filter(b -> b.getStatus() == com.siupo.restaurant.enums.EPlaceTableStatus.DENIED)
+                .count();
         
-        // Count by status for guest bookings
+        // Count by status for guest bookings — from filtered list
         Long guestPending = guestBookings.stream()
                 .filter(b -> b.getStatus() == com.siupo.restaurant.enums.EPlaceTableStatus.PENDING)
                 .count();
@@ -311,7 +319,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Long todayGuestBookings = (long) guestBookingRepository.findByStartedAtBetween(todayStart, todayEnd).size();
         Long todayBookings = todayCustomerBookings + todayGuestBookings;
         
-        // Calculate no-show rate (denied bookings / total bookings)
+        // Calculate no-show rate (denied bookings / total bookings within the same period)
         Double noShowRate = totalBookings > 0 
                 ? (totalDenied * 100.0 / totalBookings) 
                 : 0.0;
