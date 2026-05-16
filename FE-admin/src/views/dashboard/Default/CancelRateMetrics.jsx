@@ -60,7 +60,7 @@ export default function CancelRateMetrics() {
             {orderData.cancelRate ? orderData.cancelRate.toFixed(1) : 0}%
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {orderData.canceledOrders}/{orderData.totalOrders} orders canceled
+            {orderData.cancelledOrders}/{orderData.totalOrders} orders canceled
           </Typography>
         </MainCard>
       </Grid>
@@ -78,7 +78,7 @@ export default function CancelRateMetrics() {
             {bookingData.noShowRate ? bookingData.noShowRate.toFixed(1) : 0}%
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            No-shows tracked
+            {bookingData.deniedBookings || 0}/{bookingData.totalBookings || 0} no-shows tracked
           </Typography>
         </MainCard>
       </Grid>

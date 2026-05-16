@@ -1,2 +1,71 @@
+# === AI Tools (Claude, Gemini) ===
+.agents/
+.claude/
+.geminiignore
+skills-lock.json
+CLAUDE.md
+
+# === Auto-generated Docs ===
+ANALYTICS_*.md
+
+# === Lock files ===
+yarn.lock
+
+# === Dependencies ===
+node_modules/
+.pnp/
+.pnp.js
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# === Environment Variables ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Build Output ===
+FE-admin/build/
+FE-admin/dist/
+FE-customer/build/
+FE-customer/dist/
+
+# === Logs ===
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Data & Test (already had) ===
 data/
 test/
+
+# === Misc ===
+.cache/
+*.bak
+*.tmp

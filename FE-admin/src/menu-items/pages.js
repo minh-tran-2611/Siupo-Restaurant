@@ -6,6 +6,7 @@ import {
   IconMenu,
   IconPackage,
   IconPhoto,
+  IconRobot,
   IconSettings,
   IconShoppingCart,
   IconTable,
@@ -27,7 +28,8 @@ const icons = {
   IconPhoto,
   IconBell,
   IconTicket,
-  IconTag
+  IconTag,
+  IconRobot
 };
 
 // ==============================|| EXTRA PAGES MENU ITEMS ||============================== //
@@ -163,6 +165,20 @@ const pages = {
           title: 'Voucher Management',
           type: 'item',
           url: '/vouchers/management'
+        }
+      ]
+    },
+    {
+      id: 'ai-agent',
+      title: 'AI Agent',
+      type: 'collapse',
+      icon: icons.IconRobot,
+      children: [
+        {
+          id: 'agent-management',
+          title: 'Agent Management',
+          type: 'item',
+          url: '/agent/management'
         }
       ]
     },
