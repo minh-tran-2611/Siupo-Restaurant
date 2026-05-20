@@ -27,9 +27,9 @@ import C from 'assets/scss/_themes-vars.module.scss';
 // ── Status color map (from theme palette) ─────────────────────────────────────
 const STATUS_COLOR = {
   online: C.successDark,
-  task:   C.warningDark,
-  idle:   C.grey500,
-  error:  C.errorMain,
+  task: C.warningDark,
+  idle: C.grey500,
+  error: C.errorMain,
 };
 const STATUS_LABEL = { online: 'Running', task: 'Processing', idle: 'Idle', error: 'Error' };
 
@@ -37,10 +37,10 @@ const STATUS_LABEL = { online: 'Running', task: 'Processing', idle: 'Idle', erro
 //  detectProvider() inspects the API key prefix; falls back to dropdown if unknown.
 //  Order matters: 'sk-ant-' must be checked BEFORE 'sk-' (OpenAI's prefix).
 const PROVIDERS = [
-  { id: 'anthropic', name: 'Anthropic',     prefixes: ['sk-ant-'],            color: '#d97757' },
-  { id: 'openai',    name: 'OpenAI',        prefixes: ['sk-proj-', 'sk-'],    color: '#10a37f' },
-  { id: 'google',    name: 'Google Gemini', prefixes: ['AIza'],               color: '#4285f4' },
-  { id: 'xai',       name: 'xAI (Grok)',    prefixes: ['xai-'],               color: '#000000' },
+  { id: 'anthropic', name: 'Anthropic', prefixes: ['sk-ant-'], color: '#d97757' },
+  { id: 'openai', name: 'OpenAI', prefixes: ['sk-proj-', 'sk-'], color: '#10a37f' },
+  { id: 'google', name: 'Google Gemini', prefixes: ['AIza'], color: '#4285f4' },
+  { id: 'xai', name: 'xAI (Grok)', prefixes: ['xai-'], color: '#000000' },
 ];
 
 // Mock model catalog. TODO: replace with BE proxy `GET /api/agents/models?provider=...`
@@ -48,30 +48,30 @@ const PROVIDERS = [
 // and runs into CORS for OpenAI/Anthropic.
 const MOCK_MODELS = {
   anthropic: [
-    { id: 'claude-opus-4-7',           label: 'Claude Opus 4.7',     note: 'Most intelligent' },
-    { id: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6',   note: 'Balanced'         },
-    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',    note: 'Fastest'          },
-    { id: 'claude-sonnet-4-5',         label: 'Claude Sonnet 4.5',   note: ''                 },
-    { id: 'claude-haiku-3-5',          label: 'Claude Haiku 3.5',    note: ''                 },
+    { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', note: 'Most intelligent' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', note: 'Balanced' },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', note: 'Fastest' },
+    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5', note: '' },
+    { id: 'claude-haiku-3-5', label: 'Claude Haiku 3.5', note: '' },
   ],
   openai: [
-    { id: 'gpt-4o',         label: 'GPT-4o',          note: 'Most capable' },
-    { id: 'gpt-4o-mini',    label: 'GPT-4o mini',     note: 'Fast & cheap' },
-    { id: 'gpt-4-turbo',    label: 'GPT-4 Turbo',     note: ''             },
-    { id: 'o1-preview',     label: 'o1 Preview',      note: 'Reasoning'    },
-    { id: 'o1-mini',        label: 'o1 mini',         note: ''             },
+    { id: 'gpt-4o', label: 'GPT-4o', note: 'Most capable' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o mini', note: 'Fast & cheap' },
+    { id: 'gpt-4-turbo', label: 'GPT-4 Turbo', note: '' },
+    { id: 'o1-preview', label: 'o1 Preview', note: 'Reasoning' },
+    { id: 'o1-mini', label: 'o1 mini', note: '' },
   ],
   google: [
-    { id: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro',        note: ''            },
-    { id: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash',      note: 'Recommended' },
-    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', note: ''            },
-    { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash',      note: ''            },
-    { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro',        note: ''            },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', note: '' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', note: 'Recommended' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', note: '' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', note: '' },
+    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', note: '' },
   ],
   xai: [
-    { id: 'grok-2',      label: 'Grok 2',      note: '' },
+    { id: 'grok-2', label: 'Grok 2', note: '' },
     { id: 'grok-2-mini', label: 'Grok 2 mini', note: '' },
-    { id: 'grok-beta',   label: 'Grok Beta',   note: '' },
+    { id: 'grok-beta', label: 'Grok Beta', note: '' },
   ],
 };
 
@@ -210,31 +210,31 @@ const TOOL_BUNDLES = [
       {
         label: 'Analytics API',
         tools: [
-          { n: 'get_analytics_summary',   fn: 'Tổng quan KPIs theo period (doanh thu, đơn, khách)' },
-          { n: 'get_revenue_analytics',   fn: 'Báo cáo doanh thu chi tiết theo period' },
-          { n: 'get_order_analytics',     fn: 'Phân tích đơn hàng: trạng thái, hủy, hoàn thành' },
-          { n: 'get_product_analytics',   fn: 'Top sản phẩm bán chạy & hiệu suất' },
-          { n: 'get_customer_analytics',  fn: 'Phân khúc khách, VIP, retention' },
-          { n: 'get_booking_analytics',   fn: 'Thống kê đặt bàn & lịch sử' },
-          { n: 'get_analytics_insights',  fn: 'AI insights & khuyến nghị business' },
+          { n: 'get_analytics_summary', fn: 'Tổng quan KPIs theo period (doanh thu, đơn, khách)' },
+          { n: 'get_revenue_analytics', fn: 'Báo cáo doanh thu chi tiết theo period' },
+          { n: 'get_order_analytics', fn: 'Phân tích đơn hàng: trạng thái, hủy, hoàn thành' },
+          { n: 'get_product_analytics', fn: 'Top sản phẩm bán chạy & hiệu suất' },
+          { n: 'get_customer_analytics', fn: 'Phân khúc khách, VIP, retention' },
+          { n: 'get_booking_analytics', fn: 'Thống kê đặt bàn & lịch sử' },
+          { n: 'get_analytics_insights', fn: 'AI insights & khuyến nghị business' },
         ],
       },
       {
         label: 'Shared Read',
         tools: [
-          { n: 'get_search_products',      fn: 'Tìm/list sản phẩm để bổ sung context' },
-          { n: 'get_all_combos',           fn: 'Lấy danh sách combo' },
-          { n: 'get_categories',           fn: 'Lấy danh mục sản phẩm' },
-          { n: 'get_all_customers',        fn: 'Danh sách khách để phân tích sâu' },
-          { n: 'get_all_tags',             fn: 'Danh sách tag để cross-reference' },
-          { n: 'get_all_orders_admin',     fn: 'Lấy đơn hàng (filter theo status/period)' },
-          { n: 'get_order_detail_admin',   fn: 'Chi tiết đơn hàng theo id' },
-          { n: 'get_all_vouchers_admin',   fn: 'Danh sách voucher (đánh giá hiệu quả)' },
-          { n: 'get_voucher_by_id',        fn: 'Chi tiết voucher theo id' },
-          { n: 'get_order_reviews',        fn: 'Reviews của 1 đơn hàng' },
-          { n: 'get_reviews_by_order',     fn: 'Reviews đầy đủ theo order' },
+          { n: 'get_search_products', fn: 'Tìm/list sản phẩm để bổ sung context' },
+          { n: 'get_all_combos', fn: 'Lấy danh sách combo' },
+          { n: 'get_categories', fn: 'Lấy danh mục sản phẩm' },
+          { n: 'get_all_customers', fn: 'Danh sách khách để phân tích sâu' },
+          { n: 'get_all_tags', fn: 'Danh sách tag để cross-reference' },
+          { n: 'get_all_orders_admin', fn: 'Lấy đơn hàng (filter theo status/period)' },
+          { n: 'get_order_detail_admin', fn: 'Chi tiết đơn hàng theo id' },
+          { n: 'get_all_vouchers_admin', fn: 'Danh sách voucher (đánh giá hiệu quả)' },
+          { n: 'get_voucher_by_id', fn: 'Chi tiết voucher theo id' },
+          { n: 'get_order_reviews', fn: 'Reviews của 1 đơn hàng' },
+          { n: 'get_reviews_by_order', fn: 'Reviews đầy đủ theo order' },
           { n: 'get_review_by_order_item', fn: 'Review của 1 line-item' },
-          { n: 'search_internet',          fn: 'Tìm thông tin bổ sung từ Google CSE' },
+          { n: 'search_internet', fn: 'Tìm thông tin bổ sung từ Google CSE' },
         ],
       },
     ],
@@ -249,93 +249,93 @@ const TOOL_BUNDLES = [
       {
         label: 'Banner',
         tools: [
-          { n: 'get_all_banners',   fn: 'Lấy toàn bộ banner (vị trí, ảnh)' },
-          { n: 'get_banner_by_id',  fn: 'Chi tiết banner theo id' },
-          { n: 'create_banner',     fn: 'Tạo banner ở vị trí trống' },
-          { n: 'update_banner',     fn: 'Cập nhật url/position banner' },
-          { n: 'delete_banner',     fn: 'Xóa banner theo id' },
+          { n: 'get_all_banners', fn: 'Lấy toàn bộ banner (vị trí, ảnh)' },
+          { n: 'get_banner_by_id', fn: 'Chi tiết banner theo id' },
+          { n: 'create_banner', fn: 'Tạo banner ở vị trí trống' },
+          { n: 'update_banner', fn: 'Cập nhật url/position banner' },
+          { n: 'delete_banner', fn: 'Xóa banner theo id' },
         ],
       },
       {
         label: 'Category',
         tools: [
-          { n: 'get_categories',   fn: 'Lấy danh sách danh mục' },
-          { n: 'create_category',  fn: 'Tạo danh mục mới (kèm ảnh)' },
-          { n: 'update_category',  fn: 'Cập nhật tên/ảnh danh mục' },
-          { n: 'delete_category',  fn: 'Xóa danh mục theo id' },
+          { n: 'get_categories', fn: 'Lấy danh sách danh mục' },
+          { n: 'create_category', fn: 'Tạo danh mục mới (kèm ảnh)' },
+          { n: 'update_category', fn: 'Cập nhật tên/ảnh danh mục' },
+          { n: 'delete_category', fn: 'Xóa danh mục theo id' },
         ],
       },
       {
         label: 'Combo',
         tools: [
-          { n: 'get_all_combos',       fn: 'Lấy danh sách combo' },
-          { n: 'get_combo_by_id',      fn: 'Chi tiết combo theo id' },
-          { n: 'create_combo',         fn: 'Tạo combo mới (gồm sản phẩm + giá)' },
-          { n: 'update_combo',         fn: 'Cập nhật combo' },
-          { n: 'delete_combo',         fn: 'Xóa combo' },
-          { n: 'toggle_combo_status',  fn: 'Bật/tắt trạng thái combo' },
+          { n: 'get_all_combos', fn: 'Lấy danh sách combo' },
+          { n: 'get_combo_by_id', fn: 'Chi tiết combo theo id' },
+          { n: 'create_combo', fn: 'Tạo combo mới (gồm sản phẩm + giá)' },
+          { n: 'update_combo', fn: 'Cập nhật combo' },
+          { n: 'delete_combo', fn: 'Xóa combo' },
+          { n: 'toggle_combo_status', fn: 'Bật/tắt trạng thái combo' },
         ],
       },
       {
         label: 'Product',
         tools: [
-          { n: 'get_search_products',     fn: 'Tìm/list sản phẩm theo từ khóa' },
-          { n: 'create_product',          fn: 'Tạo sản phẩm mới' },
-          { n: 'update_product',          fn: 'Cập nhật sản phẩm' },
-          { n: 'delete_product',          fn: 'Xóa sản phẩm' },
-          { n: 'toggle_product_status',   fn: 'Bật/tắt trạng thái bán' },
+          { n: 'get_search_products', fn: 'Tìm/list sản phẩm theo từ khóa' },
+          { n: 'create_product', fn: 'Tạo sản phẩm mới' },
+          { n: 'update_product', fn: 'Cập nhật sản phẩm' },
+          { n: 'delete_product', fn: 'Xóa sản phẩm' },
+          { n: 'toggle_product_status', fn: 'Bật/tắt trạng thái bán' },
         ],
       },
       {
         label: 'Order',
         tools: [
-          { n: 'get_all_orders_admin',     fn: 'Danh sách đơn (filter status/period)' },
-          { n: 'get_order_detail_admin',   fn: 'Chi tiết đơn hàng theo id' },
-          { n: 'update_order_status',      fn: 'Cập nhật trạng thái đơn (PENDING/PAID/...)' },
-          { n: 'delete_order',             fn: 'Xóa đơn hàng' },
-          { n: 'get_order_reviews',        fn: 'Reviews của đơn hàng' },
+          { n: 'get_all_orders_admin', fn: 'Danh sách đơn (filter status/period)' },
+          { n: 'get_order_detail_admin', fn: 'Chi tiết đơn hàng theo id' },
+          { n: 'update_order_status', fn: 'Cập nhật trạng thái đơn (PENDING/PAID/...)' },
+          { n: 'delete_order', fn: 'Xóa đơn hàng' },
+          { n: 'get_order_reviews', fn: 'Reviews của đơn hàng' },
         ],
       },
       {
         label: 'Voucher',
         tools: [
-          { n: 'get_public_vouchers',      fn: 'Voucher public cho khách' },
-          { n: 'get_all_vouchers_admin',   fn: 'Toàn bộ voucher (admin)' },
-          { n: 'get_voucher_by_id',        fn: 'Chi tiết voucher theo id' },
-          { n: 'get_voucher_by_code',      fn: 'Tra voucher theo code' },
-          { n: 'create_voucher',           fn: 'Tạo voucher (giảm giá %, max, hạn)' },
-          { n: 'update_voucher',           fn: 'Cập nhật voucher' },
-          { n: 'delete_voucher',           fn: 'Xóa voucher' },
-          { n: 'toggle_voucher_status',    fn: 'Bật/tắt voucher' },
+          { n: 'get_public_vouchers', fn: 'Voucher public cho khách' },
+          { n: 'get_all_vouchers_admin', fn: 'Toàn bộ voucher (admin)' },
+          { n: 'get_voucher_by_id', fn: 'Chi tiết voucher theo id' },
+          { n: 'get_voucher_by_code', fn: 'Tra voucher theo code' },
+          { n: 'create_voucher', fn: 'Tạo voucher (giảm giá %, max, hạn)' },
+          { n: 'update_voucher', fn: 'Cập nhật voucher' },
+          { n: 'delete_voucher', fn: 'Xóa voucher' },
+          { n: 'toggle_voucher_status', fn: 'Bật/tắt voucher' },
         ],
       },
       {
         label: 'Tag',
         tools: [
-          { n: 'get_all_tags',  fn: 'Lấy danh sách tag' },
+          { n: 'get_all_tags', fn: 'Lấy danh sách tag' },
           { n: 'get_tag_by_id', fn: 'Chi tiết tag theo id' },
-          { n: 'create_tag',    fn: 'Tạo tag mới' },
-          { n: 'update_tag',    fn: 'Cập nhật tag' },
-          { n: 'delete_tag',    fn: 'Xóa tag' },
+          { n: 'create_tag', fn: 'Tạo tag mới' },
+          { n: 'update_tag', fn: 'Cập nhật tag' },
+          { n: 'delete_tag', fn: 'Xóa tag' },
         ],
       },
       {
         label: 'User & Notification',
         tools: [
-          { n: 'get_all_customers',           fn: 'Danh sách khách hàng' },
-          { n: 'update_customer_status',      fn: 'Cập nhật trạng thái khách (kích hoạt/khóa)' },
+          { n: 'get_all_customers', fn: 'Danh sách khách hàng' },
+          { n: 'update_customer_status', fn: 'Cập nhật trạng thái khách (kích hoạt/khóa)' },
           { n: 'get_all_notifications_admin', fn: 'Toàn bộ thông báo (admin)' },
-          { n: 'create_notification',         fn: 'Tạo thông báo gửi user' },
-          { n: 'get_my_notifications',        fn: 'Thông báo của user hiện tại' },
+          { n: 'create_notification', fn: 'Tạo thông báo gửi user' },
+          { n: 'get_my_notifications', fn: 'Thông báo của user hiện tại' },
         ],
       },
       {
         label: 'Review & Other',
         tools: [
-          { n: 'get_reviews_by_order',     fn: 'Toàn bộ review của 1 đơn' },
+          { n: 'get_reviews_by_order', fn: 'Toàn bộ review của 1 đơn' },
           { n: 'get_review_by_order_item', fn: 'Review theo line-item' },
-          { n: 'login',                    fn: 'Đăng nhập lấy access token' },
-          { n: 'search_internet',          fn: 'Google search bổ sung context' },
+          { n: 'login', fn: 'Đăng nhập lấy access token' },
+          { n: 'search_internet', fn: 'Google search bổ sung context' },
         ],
       },
     ],
@@ -397,7 +397,7 @@ const INFRA = [
 ];
 
 const CHANNELS = [
-  { id: 'zalo',  name: 'Zalo',  x: 471, y: 58, r: 22, color: '#00B14F' },
+  { id: 'zalo', name: 'Zalo', x: 471, y: 58, r: 22, color: '#00B14F' },
   { id: 'gmail', name: 'Gmail', x: 929, y: 58, r: 22, color: '#EA4335' },
 ];
 
@@ -425,35 +425,35 @@ const SCHEDULER_NODE = {
 
 const CONNECTIONS = [
   // Sub-agent delegation (function calling)
-  { from: 'orchestrator',     to: 'analytics',        type: 'primary',   fR: 52, tR: 52 },
-  { from: 'orchestrator',     to: 'management',       type: 'primary',   fR: 52, tR: 52 },
+  { from: 'orchestrator', to: 'analytics', type: 'primary', fR: 52, tR: 52 },
+  { from: 'orchestrator', to: 'management', type: 'primary', fR: 52, tR: 52 },
   // Tool bundles
-  { from: 'analytics',        to: 'tools_analytics',  type: 'tools',     fR: 52, tR: 34 },
-  { from: 'management',       to: 'tools_management', type: 'tools',     fR: 52, tR: 34 },
+  { from: 'analytics', to: 'tools_analytics', type: 'tools', fR: 52, tR: 34 },
+  { from: 'management', to: 'tools_management', type: 'tools', fR: 52, tR: 34 },
   // RAG + Web search (orchestrator + sub-agents có quyền search_documents/search_internet)
-  { from: 'orchestrator',     to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'analytics',        to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'management',       to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'orchestrator',     to: 'google',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'analytics',        to: 'google',           type: 'infra',     fR: 52, tR: 28 },
-  { from: 'management',       to: 'google',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'orchestrator', to: 'qdrant', type: 'infra', fR: 52, tR: 28 },
+  { from: 'analytics', to: 'qdrant', type: 'infra', fR: 52, tR: 28 },
+  { from: 'management', to: 'qdrant', type: 'infra', fR: 52, tR: 28 },
+  { from: 'orchestrator', to: 'google', type: 'infra', fR: 52, tR: 28 },
+  { from: 'analytics', to: 'google', type: 'infra', fR: 52, tR: 28 },
+  { from: 'management', to: 'google', type: 'infra', fR: 52, tR: 28 },
   // Memory reads per turn
-  { from: 'orchestrator',     to: 'cache',            type: 'secondary', fR: 52, tR: 28 },
-  { from: 'orchestrator',     to: 'turso',            type: 'secondary', fR: 52, tR: 28 },
+  { from: 'orchestrator', to: 'cache', type: 'secondary', fR: 52, tR: 28 },
+  { from: 'orchestrator', to: 'turso', type: 'secondary', fR: 52, tR: 28 },
   // Background per-turn workers (fork from orchestrator)
-  { from: 'orchestrator',     to: 'image_describer',  type: 'infra',     fR: 52, tR: 52 },
-  { from: 'orchestrator',     to: 'topic_classifier', type: 'infra',     fR: 52, tR: 52 },
-  { from: 'image_describer',  to: 'cache',            type: 'infra',     fR: 52, tR: 28 },
-  { from: 'topic_classifier', to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
+  { from: 'orchestrator', to: 'image_describer', type: 'infra', fR: 52, tR: 52 },
+  { from: 'orchestrator', to: 'topic_classifier', type: 'infra', fR: 52, tR: 52 },
+  { from: 'image_describer', to: 'cache', type: 'infra', fR: 52, tR: 28 },
+  { from: 'topic_classifier', to: 'turso', type: 'infra', fR: 52, tR: 28 },
   // Cache flush + consolidate
-  { from: 'cache',            to: 'turso',            type: 'infra',     fR: 28, tR: 28 },
-  { from: 'consolidate',      to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
+  { from: 'cache', to: 'turso', type: 'infra', fR: 28, tR: 28 },
+  { from: 'consolidate', to: 'turso', type: 'infra', fR: 52, tR: 28 },
   // Scheduler triggers (2 jobs)
-  { from: 'scheduler',        to: 'consolidate',      type: 'scheduled', fR: 19, tR: 52 },
-  { from: 'scheduler',        to: 'cache',            type: 'scheduled', fR: 19, tR: 28 },
-  // Future channels
-  { from: 'zalo',             to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
-  { from: 'gmail',            to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
+  { from: 'scheduler', to: 'consolidate', type: 'scheduled', fR: 19, tR: 52 },
+  { from: 'scheduler', to: 'cache', type: 'scheduled', fR: 19, tR: 28 },
+  // Active channels
+  { from: 'zalo', to: 'orchestrator', type: 'primary', fR: 22, tR: 52 },
+  { from: 'gmail', to: 'orchestrator', type: 'infra', fR: 22, tR: 52 },
 ];
 
 const NODE_MAP = {};
@@ -587,9 +587,9 @@ function InfraIcon({ type }) {
 // ── Status ring ───────────────────────────────────────────────────────────────
 const STATUS_CFG = {
   online: { r1: { dash: '16 6', w: 2.5, dur: '4.5s', dir: 1, op: 0.85 }, r2: null },
-  task:   { r1: { dash: '10 4', w: 3,   dur: '1.2s', dir: 1, op: 0.95 }, r2: { dash: '4 10', w: 1.5, dr: 8, dur: '0.9s', dir: -1, op: 0.55 } },
-  idle:   { r1: { dash: '4 12', w: 1.5, dur: null,   dir: 0, op: 0.32 }, r2: null },
-  error:  { r1: { dash: '22 4', w: 2.5, dur: null,   dir: 0, op: 0.80 }, r2: null },
+  task: { r1: { dash: '10 4', w: 3, dur: '1.2s', dir: 1, op: 0.95 }, r2: { dash: '4 10', w: 1.5, dr: 8, dur: '0.9s', dir: -1, op: 0.55 } },
+  idle: { r1: { dash: '4 12', w: 1.5, dur: null, dir: 0, op: 0.32 }, r2: null },
+  error: { r1: { dash: '22 4', w: 2.5, dur: null, dir: 0, op: 0.80 }, r2: null },
 };
 
 function StatusRing({ agent }) {
@@ -620,12 +620,12 @@ function StatusRing({ agent }) {
 
 // ── Edge styles ───────────────────────────────────────────────────────────────
 const EDGE_STYLE = {
-  primary:   { color: C.primaryMain,   width: 2,   dash: 'none' },
-  secondary: { color: C.primary200,    width: 1.8, dash: 'none' },
-  scheduled: { color: C.warningDark,   width: 1.6, dash: 'none' },
-  infra:     { color: C.grey500,       width: 1.4, dash: '5 4' },
-  tools:     { color: C.grey600,       width: 1.6, dash: 'none' },
-  future:    { color: C.grey300,       width: 1.4, dash: '5 5' },
+  primary: { color: C.primaryMain, width: 2, dash: 'none' },
+  secondary: { color: C.primary200, width: 1.8, dash: 'none' },
+  scheduled: { color: C.warningDark, width: 1.6, dash: 'none' },
+  infra: { color: C.grey500, width: 1.4, dash: '5 4' },
+  tools: { color: C.grey600, width: 1.6, dash: 'none' },
+  future: { color: C.grey300, width: 1.4, dash: '5 5' },
 };
 
 function ChevronFlow({ from, to, type, isHot, isHighlighted, anyActive, fR = 52, tR = 52 }) {
@@ -645,11 +645,11 @@ function ChevronFlow({ from, to, type, isHot, isHighlighted, anyActive, fR = 52,
 
   const style = EDGE_STYLE[type] || EDGE_STYLE.infra;
   const baseOpacity = anyActive ? (isHighlighted ? 1 : 0.18) : (type === 'future' ? 0.35 : 0.62);
-  const baseWidth   = isHighlighted ? style.width + 0.6 : style.width;
+  const baseWidth = isHighlighted ? style.width + 0.6 : style.width;
 
   const animate = type !== 'future' && (isHot || isHighlighted);
   const count = type === 'primary' ? 6 : type === 'secondary' ? 4 : type === 'scheduled' ? 4 : 3;
-  const dur   = type === 'primary' ? 1.8 : type === 'secondary' ? 2.6 : type === 'scheduled' ? 3.2 : 2.4;
+  const dur = type === 'primary' ? 1.8 : type === 'secondary' ? 2.6 : type === 'scheduled' ? 3.2 : 2.4;
 
   return (
     <g style={{ transition: 'opacity 0.35s ease', pointerEvents: 'none' }} opacity={baseOpacity}>
@@ -729,9 +729,9 @@ function ToolBundleNode({ bundle, isHovered, isLinked, onHover, onLeave, onClick
         strokeWidth={isHovered ? 2 : 1} />
       <g transform={`translate(${bundle.x},${bundle.y - 7})`} style={{ pointerEvents: 'none' }}>
         <rect x="-9" y="-8" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.60)" />
-        <rect x="2"  y="-8" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.95)" />
-        <rect x="-9" y="2"  width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.95)" />
-        <rect x="2"  y="2"  width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.60)" />
+        <rect x="2" y="-8" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.95)" />
+        <rect x="-9" y="2" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.95)" />
+        <rect x="2" y="2" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.60)" />
       </g>
       <text x={bundle.x} y={bundle.y + 22} textAnchor="middle"
         fill="rgba(255,255,255,0.92)" fontSize="7.5" fontWeight="800"
@@ -795,15 +795,13 @@ function ChannelNode({ node }) {
     <g style={{ pointerEvents: 'none' }}>
       <defs>
         <radialGradient id={`chg-${node.id}`} cx="35%" cy="30%" r="70%">
-          <stop offset="0%" stopColor={node.color} stopOpacity="0.55" />
-          <stop offset="100%" stopColor={node.color} stopOpacity="0.28" />
+          <stop offset="0%" stopColor={node.color} stopOpacity="0.75" />
+          <stop offset="100%" stopColor={node.color} stopOpacity="0.45" />
         </radialGradient>
       </defs>
-      <circle cx={node.x} cy={node.y} r={node.r + 5} fill="none" stroke={node.color} strokeWidth="1" strokeDasharray="4 4" opacity="0.42" />
-      <circle cx={node.x} cy={node.y} r={node.r} fill={`url(#chg-${node.id})`} stroke={node.color} strokeWidth="1.2" opacity="0.7" />
-      <text x={node.x} y={node.y + 4} textAnchor="middle" fill="rgba(255,255,255,0.92)" fontSize="8" fontWeight="700" fontFamily="Roboto,sans-serif">{node.name}</text>
-      <rect x={node.x - 12} y={node.y + node.r + 4} width={24} height={11} rx={5.5} fill={node.color} opacity="0.65" />
-      <text x={node.x} y={node.y + node.r + 12} textAnchor="middle" fill="rgba(255,255,255,0.95)" fontSize="6.2" fontWeight="700" fontFamily="Roboto,sans-serif">SOON</text>
+      <circle cx={node.x} cy={node.y} r={node.r + 5} fill="none" stroke={node.color} strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />
+      <circle cx={node.x} cy={node.y} r={node.r} fill={`url(#chg-${node.id})`} stroke={node.color} strokeWidth="1.5" opacity="0.9" />
+      <text x={node.x} y={node.y + 4} textAnchor="middle" fill="rgba(255,255,255,0.95)" fontSize="8" fontWeight="700" fontFamily="Roboto,sans-serif">{node.name}</text>
     </g>
   );
 }
@@ -882,7 +880,7 @@ function NodeTooltipContent({ name, role, status, configKeys }) {
 // ── Config dialog ─────────────────────────────────────────────────────────────
 // ── Agent config form: API key → provider detect → model dropdown ────────────
 function AgentConfigForm({ apiKey, provider, model, models, loadingModels, showKey,
-                           onApiKeyChange, onProviderChange, onModelChange, onToggleShowKey }) {
+  onApiKeyChange, onProviderChange, onModelChange, onToggleShowKey }) {
   const detected = detectProvider(apiKey);
   const providerLocked = !!detected;
   const providerObj = PROVIDERS.find((p) => p.id === provider);
@@ -995,7 +993,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
     if (!open || !node) return;
     if (kind === 'agent') {
       const initApiKey = node.config?.apiKey || '';
-      const initModel  = node.config?.model  || '';
+      const initModel = node.config?.model || '';
       setApiKey(initApiKey);
       setModel(initModel);
       setShowKey(false);
@@ -1195,7 +1193,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                   {group.tools.map((tool, ti) => {
                     const name = typeof tool === 'string' ? tool : tool.n;
-                    const fn   = typeof tool === 'string' ? null   : tool.fn;
+                    const fn = typeof tool === 'string' ? null : tool.fn;
                     return (
                       <Box key={ti} sx={{
                         display: 'flex', alignItems: 'baseline', gap: 1,
@@ -1270,7 +1268,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AgentDiagram() {
   const theme = useTheme();
-  const [hoveredId,    setHoveredId]    = useState(null);  // any node id (agent / infra / bundle)
+  const [hoveredId, setHoveredId] = useState(null);  // any node id (agent / infra / bundle)
   const [dialogTarget, setDialogTarget] = useState(null);  // { node, kind } | null
 
   // Live telemetry from BE event bus (SSE).
@@ -1291,7 +1289,7 @@ export default function AgentDiagram() {
   const isConnHighlighted = (conn) => {
     if (!hoveredId) return false;
     return conn.from === hoveredId || conn.to === hoveredId
-        || conn.from === activeAgent || conn.to === activeAgent;
+      || conn.from === activeAgent || conn.to === activeAgent;
   };
 
   const isEdgeHot = (conn) => activeEdges.has(`${conn.from}>${conn.to}`);
