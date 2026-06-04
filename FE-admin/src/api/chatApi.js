@@ -15,7 +15,7 @@ const chatApi = {
    * @param {string} data.userId
    * @param {string} data.message
    * @param {Array<{ data: string, mime: string }>} [data.images] - base64-encoded image attachments (session-only, không lưu DB)
-   * @returns {Promise<{ reply: string }>}
+   * @returns {Promise<{ reply: string, files: Array<{ file_id: string, filename: string, extension: string, mime_type: string, size_bytes: number }> }>}
    */
   sendMessage: (data) => aiAgentClient.post('/chat', data).then((res) => res.data),
 

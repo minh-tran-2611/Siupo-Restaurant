@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import useAgentEventStream from 'hooks/useAgentEventStream';
+import agentApi from 'api/agentApi';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
@@ -988,9 +989,14 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
   const [models, setModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  // Consolidate node — manual run state
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState(null);
 
   useEffect(() => {
     if (!open || !node) return;
+    setRunning(false);
+    setRunResult(null);
     if (kind === 'agent') {
       const initApiKey = node.config?.apiKey || '';
       const initModel = node.config?.model || '';
@@ -1071,6 +1077,19 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
       onSave?.(node.id, draft);
     }
     onClose();
+  };
+
+  const handleRunConsolidate = async () => {
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await agentApi.runConsolidate();
+      setRunResult({ ok: true, message: res?.message || 'Consolidate hoàn tất' });
+    } catch (e) {
+      setRunResult({ ok: false, message: e?.response?.data?.detail || e.message || 'Chạy thất bại' });
+    } finally {
+      setRunning(false);
+    }
   };
 
   // Save button validation
@@ -1246,6 +1265,29 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
+        {node.id === 'consolidate' && (
+          <Box sx={{ mr: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Button
+              onClick={handleRunConsolidate}
+              variant="outlined"
+              disabled={running}
+              startIcon={running ? <CircularProgress size={14} /> : null}
+              sx={{ borderColor: accent, color: accent, '&:hover': { borderColor: accent, bgcolor: alpha(accent, 0.08) } }}
+            >
+              {running ? 'Đang chạy…' : 'Chạy consolidate ngay'}
+            </Button>
+            {runResult && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, maxWidth: 200 }}>
+                {runResult.ok
+                  ? <IconCheck size={15} color={C.successDark} />
+                  : <IconAlertCircle size={15} color={C.errorMain} />}
+                <Typography sx={{ fontSize: '0.72rem', color: runResult.ok ? 'success.main' : 'error.main', lineHeight: 1.3 }}>
+                  {runResult.message}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
         {kind === 'bundle' || kind === 'scheduler' ? (
           <Button onClick={onClose} variant="contained"
             sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
