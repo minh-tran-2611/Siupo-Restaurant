@@ -35,7 +35,14 @@ const agentApi = {
   /**
    * URL của SSE event stream (dùng trực tiếp với EventSource).
    */
-  eventsUrl: () => `${AI_AGENT_BASE_URL.replace(/\/$/, '')}/agents/events`
+  eventsUrl: () => `${AI_AGENT_BASE_URL.replace(/\/$/, '')}/agents/events`,
+
+  /**
+   * Chạy consolidate thủ công (nút trên node Consolidate trong sơ đồ).
+   * Chạy đồng bộ, trả về khi hoàn tất.
+   * @returns {Promise<{ status: string, message: string }>}
+   */
+  runConsolidate: () => aiAgentClient.post('/agents/consolidate/run').then((res) => res.data)
 };
 
 export default agentApi;

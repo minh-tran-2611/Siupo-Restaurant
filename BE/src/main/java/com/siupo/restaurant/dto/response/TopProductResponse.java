@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TopProductResponse {
     private Long productId;
+    private String itemType; // "PRODUCT" or "COMBO"
     private String productName;
     private String productImageUrl;
     private Integer totalQuantitySold;
