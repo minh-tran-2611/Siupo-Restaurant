@@ -60,7 +60,14 @@ const agentApi = {
    * @param {string[]} urls
    * @returns {Promise<{ status: string, urls: string[], message: string }>}
    */
-  saveCrawlConfig: (urls) => aiAgentClient.put('/agents/crawl/config', { urls }).then((res) => res.data)
+  saveCrawlConfig: (urls) => aiAgentClient.put('/agents/crawl/config', { urls }).then((res) => res.data),
+
+  /**
+   * Chạy consolidate thủ công (nút trên node Consolidate trong sơ đồ).
+   * Chạy đồng bộ, trả về khi hoàn tất.
+   * @returns {Promise<{ status: string, message: string }>}
+   */
+  runConsolidate: () => aiAgentClient.post('/agents/consolidate/run').then((res) => res.data)
 };
 
 export default agentApi;

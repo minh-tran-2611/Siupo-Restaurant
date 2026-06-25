@@ -3,8 +3,10 @@ package com.siupo.restaurant.service.analytics;
 import com.siupo.restaurant.dto.request.AnalyticsRequest;
 import com.siupo.restaurant.dto.response.*;
 import com.siupo.restaurant.enums.EOrderStatus;
+import com.siupo.restaurant.model.Combo;
 import com.siupo.restaurant.model.Order;
 import com.siupo.restaurant.model.OrderItem;
+import com.siupo.restaurant.model.Product;
 import com.siupo.restaurant.repository.CustomerRepository;
 import com.siupo.restaurant.repository.OrderRepository;
 import com.siupo.restaurant.repository.PlaceTableForCustomerRepository;
@@ -47,7 +49,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
 
     @Override
-    @Cacheable(value = "analytics-revenue", key = "#request.period", unless = "#result == null")
+    @Cacheable(value = "analytics-revenue", key = "#request.period + '-' + #request.startDate + '-' + #request.endDate", unless = "#result == null")
     public RevenueAnalyticsResponse getRevenueAnalytics(AnalyticsRequest request) {
         DateRange range = getDateRange(request);
         
@@ -97,7 +99,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
 
     @Override
-    @Cacheable(value = "analytics-orders", key = "#request.period", unless = "#result == null")
+    @Cacheable(value = "analytics-orders", key = "#request.period + '-' + #request.startDate + '-' + #request.endDate", unless = "#result == null")
     public OrderAnalyticsResponse getOrderAnalytics(AnalyticsRequest request) {
         DateRange range = getDateRange(request);
         
@@ -149,49 +151,53 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "analytics-products", key = "#request.period + '-' + #limit", unless = "#result == null")
+    @Cacheable(value = "analytics-products", key = "#request.period + '-' + #request.startDate + '-' + #request.endDate + '-' + #limit", unless = "#result == null")
     public ProductAnalyticsResponse getProductAnalytics(AnalyticsRequest request, Integer limit) {
         DateRange range = getDateRange(request);
 
         // Get completed orders only
         List<Order> completedOrders = orderRepository.findByStatusAndCreatedAtBetween(
                 EOrderStatus.COMPLETED, range.start, range.end);
-        
-        // Calculate product/combo statistics using "P_{id}" / "C_{id}" keys to avoid ID collision
+
+        // Calculate product/combo statistics. Key by type prefix to avoid id collisions.
         Map<String, ProductStats> productStatsMap = new HashMap<>();
 
         for (Order order : completedOrders) {
             if (order.getItems() != null) {
                 for (OrderItem item : order.getItems()) {
                     String key;
-                    ProductStats entry;
-
+                    ProductStats template;
                     if (item.getProduct() != null) {
-                        key = "P_" + item.getProduct().getId();
-                        productStatsMap.putIfAbsent(key, new ProductStats(
-                                item.getProduct().getId(),
-                                item.getProduct().getName(),
-                                item.getProduct().getImages() != null && !item.getProduct().getImages().isEmpty()
-                                        ? item.getProduct().getImages().get(0).getUrl() : null,
-                                "PRODUCT"
-                        ));
+                        Product product = item.getProduct();
+                        key = "P-" + product.getId();
+                        template = new ProductStats(
+                                product.getId(),
+                                "PRODUCT",
+                                product.getName(),
+                                product.getImages() != null && !product.getImages().isEmpty()
+                                        ? product.getImages().get(0).getUrl() : null
+                        );
                     } else if (item.getCombo() != null) {
-                        key = "C_" + item.getCombo().getId();
-                        productStatsMap.putIfAbsent(key, new ProductStats(
-                                item.getCombo().getId(),
-                                item.getCombo().getName(),
-                                item.getCombo().getImages() != null && !item.getCombo().getImages().isEmpty()
-                                        ? item.getCombo().getImages().get(0).getUrl() : null,
-                                "COMBO"
-                        ));
+                        Combo combo = item.getCombo();
+                        key = "C-" + combo.getId();
+                        template = new ProductStats(
+                                combo.getId(),
+                                "COMBO",
+                                combo.getName(),
+                                combo.getImages() != null && !combo.getImages().isEmpty()
+                                        ? combo.getImages().get(0).getUrl() : null
+                        );
                     } else {
+                        // Orphan line with neither product nor combo: skip defensively
                         continue;
                     }
 
-                    entry = productStatsMap.get(key);
-                    entry.totalQuantity += item.getQuantity().intValue();
-                    entry.totalRevenue += item.getPrice() * item.getQuantity();
-                    entry.orderCount += 1;
+                    productStatsMap.putIfAbsent(key, template);
+
+                    ProductStats stats = productStatsMap.get(key);
+                    stats.totalQuantity += item.getQuantity().intValue();
+                    stats.totalRevenue += item.getPrice() * item.getQuantity();
+                    stats.orderCount += 1;
                 }
             }
         }
@@ -200,6 +206,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         List<TopProductResponse> allProducts = productStatsMap.values().stream()
                 .map(stats -> TopProductResponse.builder()
                         .productId(stats.productId)
+                        .itemType(stats.itemType)
                         .productName(stats.productName)
                         .productImageUrl(stats.imageUrl)
                         .totalQuantitySold(stats.totalQuantity)
@@ -600,6 +607,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     
     private static class ProductStats {
         Long productId;
+        String itemType;
         String productName;
         String imageUrl;
         String type; // "PRODUCT" or "COMBO"
@@ -607,11 +615,12 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Double totalRevenue = 0.0;
         Integer orderCount = 0;
 
-        ProductStats(Long productId, String productName, String imageUrl, String type) {
+        ProductStats(Long productId, String itemType, String productName, String imageUrl) {
             this.productId = productId;
+            this.itemType = itemType;
             this.productName = productName;
             this.imageUrl = imageUrl;
-            this.type = type;
+            this.type = itemType;
         }
     }
     

@@ -18,6 +18,7 @@ import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import { useTheme, alpha } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 // icons
 import {
@@ -31,17 +32,29 @@ import {
   IconPaperclip,
   IconFile,
   IconPhoto,
-  IconUpload
+  IconUpload,
+  IconDownload,
+  IconFileText
 } from '@tabler/icons-react';
 
 // project imports
 import chatApi from 'api/chatApi';
 import fileApi from 'api/fileApi';
+import { drawerWidth } from 'store/constant';
+import { useGetMenuMaster } from 'api/menu';
 
 // ==============================|| AI CHATBOX ||============================== //
 
 const ATTACHMENT_ACCEPT = '.md,.txt,.pdf,.docx,.json,.csv,.jpg,.jpeg,.png,.gif,.webp';
 const MAX_ATTACHMENTS = 5;
+
+// Layout constants
+const HEADER_HEIGHT = 88;
+const FAB_SIZE = 56;
+const FAB_MARGIN = 24;
+const COMPACT_WIDTH = 400;
+const COMPACT_HEIGHT = 540;
+const COMPACT_GAP = 16; // gap between FAB and chat window
 
 function attachmentIcon(mime = '') {
   return mime.startsWith('image/') ? IconPhoto : IconFile;
@@ -55,8 +68,32 @@ function shortName(name, max = 24) {
   return base.slice(0, max - ext.length - 1) + '…' + ext;
 }
 
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtLabel(ext) {
+  const map = {
+    md: 'Markdown',
+    pdf: 'PDF',
+    docx: 'DOCX',
+    txt: 'Text',
+    csv: 'CSV',
+    json: 'JSON',
+    xlsx: 'Excel',
+  };
+  return map[ext?.toLowerCase()] || (ext ? ext.toUpperCase() : 'File');
+}
+
 export default function ChatBox() {
   const theme = useTheme();
+  const downMD = useMediaQuery(theme.breakpoints.down('md'));
+
+  const { menuMaster } = useGetMenuMaster();
+  const drawerOpen = menuMaster?.isDashboardDrawerOpened;
 
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -65,12 +102,7 @@ export default function ChatBox() {
   const [loading, setLoading] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
 
-  // Attachments:
-  //   { localId, file, name, mime, size, kind: 'image'|'doc',
-  //     status: 'uploading'|'done'|'error',
-  //     remote?  (doc only — server file metadata),
-  //     data?    (image only — base64 string),
-  //     error? }
+  // Attachments state
   const [attachments, setAttachments] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
@@ -101,6 +133,9 @@ export default function ChatBox() {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 300);
       setHasNewMessage(false);
+    } else {
+      // Reset expanded when closing
+      setExpanded(false);
     }
   }, [open]);
 
@@ -117,9 +152,22 @@ export default function ChatBox() {
     return () => window.removeEventListener('keydown', handler);
   }, [open]);
 
+  // ESC to close expanded mode, or close chat
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        if (expanded) {
+          setExpanded(false);
+        } else if (open) {
+          setOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, expanded]);
+
   // ── Attachment helpers ──────────────────────────────────────────────
-  // Images: read as base64 inline, kept in cache for the session only.
-  // Documents: uploaded to /files endpoint (Qdrant-indexed).
   const readAsBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -241,8 +289,6 @@ export default function ChatBox() {
   };
 
   // ── Send ─────────────────────────────────────────────────────────────
-  // Documents: prefix filenames into the message text (agent sees them via RAG).
-  // Images: passed inline as base64 — kept session-only on the server.
   const buildMessageWithDocs = (text, readyDocs) => {
     if (!readyDocs.length) return text;
     const lines = readyDocs.map((a) => `- ${a.remote?.filename || a.name}`).join('\n');
@@ -251,13 +297,14 @@ export default function ChatBox() {
 
   const handleToggle = () => setOpen((prev) => !prev);
   const handleClose = () => setOpen(false);
+  const handleToggleExpand = () => setExpanded((prev) => !prev);
 
   const handleSend = async () => {
     const trimmed = input.trim();
     const ready = attachments.filter((a) => a.status === 'done');
     const stillUploading = attachments.some((a) => a.status === 'uploading');
 
-    if (stillUploading) return; // wait for uploads
+    if (stillUploading) return;
     if (!trimmed && !ready.length) return;
     if (loading) return;
 
@@ -275,7 +322,7 @@ export default function ChatBox() {
         name: a.remote?.filename || a.name,
         mime: a.mime,
         kind: a.kind,
-        data: a.kind === 'image' ? a.data : undefined
+        dataUrl: a.kind === 'image' && a.data ? `data:${a.mime};base64,${a.data}` : null
       })),
       timestamp: new Date()
     };
@@ -296,6 +343,7 @@ export default function ChatBox() {
         id: Date.now() + 1,
         type: 'ai',
         content: res.reply,
+        files: res.files || [],
         timestamp: new Date()
       };
       setMessages((prev) => [...prev, aiMessage]);
@@ -342,34 +390,67 @@ export default function ChatBox() {
     attachments.some((a) => a.status === 'uploading') ||
     (!input.trim() && !attachments.some((a) => a.status === 'done'));
 
+  // ── Compute positions for compact vs expanded ────────────────────────
+  // Sidebar offset for expanded mode
+  const sidebarOffset = downMD ? 0 : (drawerOpen ? drawerWidth : 72);
+
+  // Compact: position right above the FAB
+  const compactSx = {
+    position: 'fixed',
+    bottom: FAB_MARGIN + FAB_SIZE + COMPACT_GAP,
+    right: FAB_MARGIN,
+    width: { xs: 'calc(100vw - 32px)', sm: COMPACT_WIDTH },
+    height: { xs: 'calc(100vh - 140px)', sm: COMPACT_HEIGHT },
+    maxHeight: '85vh',
+    borderRadius: 3,
+  };
+
+  // Expanded: fill the main content area (beside sidebar, below header)
+  const expandedSx = {
+    position: 'fixed',
+    top: HEADER_HEIGHT,
+    bottom: 0,
+    right: 0,
+    left: sidebarOffset,
+    width: 'auto',
+    height: 'auto',
+    maxHeight: 'none',
+    borderRadius: 0,
+  };
+
+  const chatWindowSx = expanded ? expandedSx : compactSx;
+
   return (
     <>
       {/* Chat Window */}
-      <Grow in={open} style={{ transformOrigin: 'bottom right' }}>
+      {open && (
         <Paper
-          elevation={16}
+          elevation={expanded ? 0 : 16}
           onDragEnter={onDragEnter}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           sx={{
-            position: 'fixed',
-            bottom: 96,
-            right: 24,
-            width: expanded
-              ? { xs: 'calc(100vw - 32px)', sm: 'min(1600px, calc(100vw - 48px))' }
-              : { xs: 'calc(100vw - 32px)', sm: 400 },
-            height: expanded
-              ? { xs: 'calc(100vh - 108px)', sm: 'calc(100vh - 116px)' }
-              : { xs: 'calc(100vh - 140px)', sm: 540 },
-            maxHeight: '92vh',
-            display: open ? 'flex' : 'none',
+            ...chatWindowSx,
+            display: 'flex',
             flexDirection: 'column',
-            borderRadius: 3,
             overflow: 'hidden',
-            zIndex: 1300,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-            transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1), height 0.25s cubic-bezier(0.4,0,0.2,1)'
+            zIndex: expanded ? 1400 : 1300,
+            border: expanded
+              ? `1px solid ${alpha(theme.palette.divider, 0.12)}`
+              : `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            animation: expanded ? 'none' : 'chatSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            '@keyframes chatSlideUp': {
+              '0%': {
+                opacity: 0,
+                transform: 'translateY(20px) scale(0.95)',
+              },
+              '100%': {
+                opacity: 1,
+                transform: 'translateY(0) scale(1)',
+              },
+            },
           }}
         >
           {/* Drag overlay */}
@@ -388,7 +469,7 @@ export default function ChatBox() {
                 pointerEvents: 'none',
                 border: `2px dashed ${alpha('#fff', 0.6)}`,
                 m: 0.5,
-                borderRadius: 2.5
+                borderRadius: expanded ? 0 : 2.5
               }}
             >
               <IconUpload size={48} />
@@ -406,12 +487,13 @@ export default function ChatBox() {
             sx={{
               background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               color: '#fff',
-              px: 2,
+              px: expanded ? 3 : 2,
               py: 1.5,
               display: 'flex',
               alignItems: 'center',
               gap: 1.5,
-              minHeight: 60
+              minHeight: expanded ? 64 : 60,
+              transition: 'all 0.3s ease',
             }}
           >
             <Avatar sx={{ bgcolor: alpha('#fff', 0.2), width: 36, height: 36 }}>
@@ -425,11 +507,16 @@ export default function ChatBox() {
                 {loading ? 'Đang nhập...' : 'Trực tuyến · Ctrl+Shift+S để đính kèm'}
               </Typography>
             </Box>
-            <Tooltip title={expanded ? 'Thu nhỏ' : 'Phóng to'}>
+            <Tooltip title={expanded ? 'Thu nhỏ' : 'Mở rộng'}>
               <IconButton
                 size="small"
-                sx={{ color: '#fff', '&:hover': { bgcolor: alpha('#fff', 0.15) } }}
-                onClick={() => setExpanded((v) => !v)}
+                sx={{
+                  color: '#fff',
+                  '&:hover': { bgcolor: alpha('#fff', 0.15) },
+                  transition: 'transform 0.3s ease',
+                  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+                onClick={handleToggleExpand}
               >
                 {expanded ? <IconArrowsMinimize size={18} /> : <IconArrowsMaximize size={18} />}
               </IconButton>
@@ -444,11 +531,12 @@ export default function ChatBox() {
             sx={{
               flex: 1,
               overflowY: 'auto',
-              p: 2,
+              p: expanded ? 3 : 2,
               bgcolor: theme.palette.grey[50],
               display: 'flex',
               flexDirection: 'column',
               gap: 1.5,
+              transition: 'padding 0.3s ease',
               '&::-webkit-scrollbar': { width: 6 },
               '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
               '&::-webkit-scrollbar-thumb': {
@@ -473,15 +561,16 @@ export default function ChatBox() {
                 <Avatar
                   sx={{
                     bgcolor: alpha(theme.palette.primary.main, 0.1),
-                    width: 64,
-                    height: 64,
-                    color: theme.palette.primary.main
+                    width: expanded ? 80 : 64,
+                    height: expanded ? 80 : 64,
+                    color: theme.palette.primary.main,
+                    transition: 'all 0.3s ease',
                   }}
                 >
-                  <IconRobot size={36} />
+                  <IconRobot size={expanded ? 44 : 36} />
                 </Avatar>
-                <Box sx={{ textAlign: 'center', px: 2 }}>
-                  <Typography variant="h5" sx={{ color: theme.palette.grey[700], mb: 0.5 }}>
+                <Box sx={{ textAlign: 'center', px: 2, maxWidth: expanded ? 600 : 'none' }}>
+                  <Typography variant={expanded ? 'h4' : 'h5'} sx={{ color: theme.palette.grey[700], mb: 0.5, transition: 'all 0.3s ease' }}>
                     Xin chào!
                   </Typography>
                   <Typography variant="body2" sx={{ color: theme.palette.grey[500], lineHeight: 1.6 }}>
@@ -498,7 +587,13 @@ export default function ChatBox() {
                   display: 'flex',
                   gap: 1,
                   alignItems: 'flex-end',
-                  flexDirection: msg.type === 'user' ? 'row-reverse' : 'row'
+                  flexDirection: msg.type === 'user' ? 'row-reverse' : 'row',
+                  // In expanded mode, center the messages with max-width
+                  ...(expanded && {
+                    maxWidth: 800,
+                    mx: 'auto',
+                    width: '100%',
+                  }),
                 }}
               >
                 <Avatar
@@ -514,7 +609,7 @@ export default function ChatBox() {
 
                 <Box
                   sx={{
-                    maxWidth: expanded ? '72%' : '78%',
+                    maxWidth: expanded ? '70%' : '78%',
                     px: 1.5,
                     py: 1,
                     borderRadius: 2,
@@ -533,46 +628,75 @@ export default function ChatBox() {
                 >
                   {/* Attachments inside user bubble */}
                   {msg.attachments?.length > 0 && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: msg.content ? 0.75 : 0 }}>
-                      {msg.attachments.map((att, idx) => {
-                        if (att.kind === 'image' && att.data) {
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mb: msg.content ? 0.75 : 0 }}>
+                      {/* Image thumbnails grid */}
+                      {msg.attachments.some((att) => att.kind === 'image' && att.dataUrl) && (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {msg.attachments
+                            .filter((att) => att.kind === 'image' && att.dataUrl)
+                            .map((att, idx) => (
+                              <Box
+                                key={`img-${idx}`}
+                                sx={{
+                                  position: 'relative',
+                                  borderRadius: 1.5,
+                                  overflow: 'hidden',
+                                  width: expanded ? 160 : 120,
+                                  height: expanded ? 120 : 90,
+                                  flexShrink: 0,
+                                  cursor: 'pointer',
+                                  border: `2px solid ${alpha('#fff', 0.25)}`,
+                                  transition: 'all 0.2s ease',
+                                  '&:hover': {
+                                    border: `2px solid ${alpha('#fff', 0.5)}`,
+                                    transform: 'scale(1.02)',
+                                  },
+                                  '&:hover .img-overlay': { opacity: 1 },
+                                }}
+                                onClick={() => window.open(att.dataUrl, '_blank')}
+                              >
+                                <Box
+                                  component="img"
+                                  src={att.dataUrl}
+                                  alt={att.name}
+                                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                                <Box
+                                  className="img-overlay"
+                                  sx={{
+                                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                                    px: 0.75, py: 0.5, bgcolor: alpha('#000', 0.55),
+                                    opacity: 0, transition: 'opacity 0.2s ease',
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{
+                                    color: '#fff', fontSize: '0.65rem', display: 'block',
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  }}>
+                                    {shortName(att.name, 20)}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            ))}
+                        </Box>
+                      )}
+                      {/* Non-image attachments as text chips */}
+                      {msg.attachments
+                        .filter((att) => att.kind !== 'image' || !att.dataUrl)
+                        .map((att, idx) => {
+                          const Icon = attachmentIcon(att.mime);
                           return (
-                            <Box
-                              key={idx}
-                              component="img"
-                              src={`data:${att.mime};base64,${att.data}`}
-                              alt={att.name}
-                              sx={{
-                                width: 80,
-                                height: 80,
-                                objectFit: 'cover',
-                                borderRadius: 1.5,
-                                border: `2px solid ${alpha('#fff', 0.4)}`
-                              }}
-                            />
+                            <Box key={`doc-${idx}`} sx={{
+                              display: 'flex', alignItems: 'center', gap: 0.75,
+                              px: 0.75, py: 0.5, borderRadius: 1, bgcolor: alpha('#fff', 0.18)
+                            }}>
+                              <Icon size={14} />
+                              <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#fff' }}>
+                                {shortName(att.name, 28)}
+                              </Typography>
+                            </Box>
                           );
-                        }
-                        const Icon = attachmentIcon(att.mime);
-                        return (
-                          <Box
-                            key={idx}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.75,
-                              px: 0.75,
-                              py: 0.5,
-                              borderRadius: 1,
-                              bgcolor: alpha('#fff', 0.18)
-                            }}
-                          >
-                            <Icon size={14} />
-                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#fff' }}>
-                              {shortName(att.name, 28)}
-                            </Typography>
-                          </Box>
-                        );
-                      })}
+                        })}
                     </Box>
                   )}
                   {msg.content && (
@@ -582,11 +706,128 @@ export default function ChatBox() {
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
                         lineHeight: 1.6,
-                        fontSize: '0.85rem'
+                        fontSize: expanded ? '0.9rem' : '0.85rem'
                       }}
                     >
                       {msg.content}
                     </Typography>
+                  )}
+                  {/* File download cards (Claude-style) */}
+                  {msg.files?.length > 0 && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: msg.content ? 1.5 : 0 }}>
+                      {msg.files.map((file) => (
+                        <Box
+                          key={file.file_id}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
+                            bgcolor: alpha(theme.palette.grey[100], 0.6),
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.primary.main, 0.04),
+                              borderColor: alpha(theme.palette.primary.main, 0.25),
+                              boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.08)}`,
+                            },
+                          }}
+                        >
+                          {/* File icon */}
+                          <Avatar
+                            variant="rounded"
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              bgcolor: alpha(theme.palette.primary.main, 0.08),
+                              color: theme.palette.primary.main,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <IconFileText size={22} />
+                          </Avatar>
+                          {/* File info */}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: theme.palette.grey[800],
+                                lineHeight: 1.3,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                fontSize: '0.82rem',
+                              }}
+                            >
+                              {file.filename}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25 }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: theme.palette.grey[500],
+                                  fontSize: '0.7rem',
+                                }}
+                              >
+                                Document · {getExtLabel(file.extension)}
+                              </Typography>
+                              {file.size_bytes > 0 && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: theme.palette.grey[400],
+                                    fontSize: '0.68rem',
+                                  }}
+                                >
+                                  · {formatFileSize(file.size_bytes)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          {/* Extension badge */}
+                          <Chip
+                            label={file.extension?.toUpperCase() || 'FILE'}
+                            size="small"
+                            sx={{
+                              height: 22,
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: theme.palette.primary.main,
+                              border: 'none',
+                              letterSpacing: 0.5,
+                              flexShrink: 0,
+                            }}
+                          />
+                          {/* Download button */}
+                          <Tooltip title="Tải xuống" placement="top">
+                            <IconButton
+                              size="small"
+                              component="a"
+                              href={fileApi.getDownloadUrl(file.file_id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{
+                                bgcolor: theme.palette.primary.main,
+                                color: '#fff',
+                                width: 34,
+                                height: 34,
+                                flexShrink: 0,
+                                '&:hover': {
+                                  bgcolor: theme.palette.primary.dark,
+                                  transform: 'scale(1.05)',
+                                },
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <IconDownload size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      ))}
+                    </Box>
                   )}
                   <Typography
                     variant="caption"
@@ -605,7 +846,18 @@ export default function ChatBox() {
             ))}
 
             {loading && (
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  alignItems: 'flex-end',
+                  ...(expanded && {
+                    maxWidth: 800,
+                    mx: 'auto',
+                    width: '100%',
+                  }),
+                }}
+              >
                 <Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.primary.main, flexShrink: 0 }}>
                   <IconRobot size={16} />
                 </Avatar>
@@ -653,13 +905,20 @@ export default function ChatBox() {
           {attachments.length > 0 && (
             <Box
               sx={{
-                px: 1.25,
+                px: expanded ? 3 : 1.25,
                 pt: 1,
                 pb: 0.5,
                 bgcolor: '#fff',
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: 0.5
+                gap: 0.5,
+                transition: 'padding 0.3s ease',
+                ...(expanded && {
+                  maxWidth: 856,
+                  mx: 'auto',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }),
               }}
             >
               {attachments.map((a) => {
@@ -785,7 +1044,7 @@ export default function ChatBox() {
             </Box>
           )}
 
-          {/* Upload progress bar (visible while any uploading) */}
+          {/* Upload progress bar */}
           {attachments.some((a) => a.status === 'uploading') && (
             <LinearProgress sx={{ height: 2 }} />
           )}
@@ -793,129 +1052,190 @@ export default function ChatBox() {
           {/* Input Area */}
           <Box
             sx={{
-              p: 1.5,
+              p: expanded ? 2 : 1.5,
               bgcolor: '#fff',
               display: 'flex',
               gap: 0.5,
-              alignItems: 'flex-end'
+              alignItems: 'flex-end',
+              transition: 'padding 0.3s ease',
+              ...(expanded && {
+                borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              }),
             }}
           >
-            <Tooltip title={`Đính kèm file (Ctrl+Shift+S)`} placement="top">
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading || attachments.length >= MAX_ATTACHMENTS}
-                  sx={{ color: theme.palette.grey[600] }}
-                >
-                  <IconPaperclip size={18} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <input
-              ref={fileInputRef}
-              type="file"
-              hidden
-              multiple
-              accept={ATTACHMENT_ACCEPT}
-              onChange={(e) => {
-                handleAddFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
-            <TextField
-              inputRef={inputRef}
-              fullWidth
-              multiline
-              maxRows={3}
-              placeholder="Nhập tin nhắn... (Ctrl+V để dán ảnh, kéo-thả file)"
-              variant="outlined"
-              size="small"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={onPaste}
-              disabled={loading}
+            {/* In expanded mode, center the input area */}
+            <Box
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  fontSize: '0.875rem',
-                  bgcolor: theme.palette.grey[50],
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: theme.palette.primary.main,
-                    borderWidth: 1.5
-                  }
-                }
+                display: 'flex',
+                gap: 0.5,
+                alignItems: 'flex-end',
+                width: '100%',
+                ...(expanded && {
+                  maxWidth: 800,
+                  mx: 'auto',
+                }),
               }}
-              slotProps={{
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={handleSend}
-                        disabled={sendDisabled}
-                        sx={{
-                          bgcolor: !sendDisabled ? theme.palette.primary.main : 'transparent',
-                          color: !sendDisabled ? '#fff' : theme.palette.grey[400],
-                          width: 32,
-                          height: 32,
-                          '&:hover': {
-                            bgcolor: !sendDisabled ? theme.palette.primary.dark : 'transparent'
-                          },
-                          '&.Mui-disabled': { color: theme.palette.grey[300] },
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {loading ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : <IconSend size={16} />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
-          </Box>
-        </Paper>
-      </Grow>
-
-      {/* Floating Action Button */}
-      <ClickAwayListener onClickAway={() => {}}>
-        <Tooltip title={open ? '' : 'Chat với AI Assistant'} placement="left">
-          <Fab
-            color="primary"
-            onClick={handleToggle}
-            sx={{
-              position: 'fixed',
-              bottom: 24,
-              right: 24,
-              zIndex: 1300,
-              width: 56,
-              height: 56,
-              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-              background: open
-                ? theme.palette.grey[600]
-                : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              '&:hover': {
-                background: open
-                  ? theme.palette.grey[700]
-                  : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.5)}`
-              },
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}
-          >
-            <Badge
-              color="error"
-              variant="dot"
-              invisible={!hasNewMessage}
-              sx={{ '& .MuiBadge-badge': { top: 4, right: 4 } }}
             >
-              {open ? <IconX size={24} /> : <IconMessageCircle size={24} />}
-            </Badge>
-          </Fab>
-        </Tooltip>
-      </ClickAwayListener>
+              <Tooltip title={`Đính kèm file (Ctrl+Shift+S)`} placement="top">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading || attachments.length >= MAX_ATTACHMENTS}
+                    sx={{ color: theme.palette.grey[600] }}
+                  >
+                    <IconPaperclip size={18} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                multiple
+                accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => {
+                  handleAddFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              <TextField
+                inputRef={inputRef}
+                fullWidth
+                multiline
+                maxRows={expanded ? 6 : 3}
+                placeholder="Nhập tin nhắn... (Ctrl+V để dán ảnh, kéo-thả file)"
+                variant="outlined"
+                size="small"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={onPaste}
+                disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    fontSize: expanded ? '0.95rem' : '0.875rem',
+                    bgcolor: theme.palette.grey[50],
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme.palette.primary.main,
+                      borderWidth: 1.5
+                    }
+                  }
+                }}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={handleSend}
+                          disabled={sendDisabled}
+                          sx={{
+                            bgcolor: !sendDisabled ? theme.palette.primary.main : 'transparent',
+                            color: !sendDisabled ? '#fff' : theme.palette.grey[400],
+                            width: 32,
+                            height: 32,
+                            '&:hover': {
+                              bgcolor: !sendDisabled ? theme.palette.primary.dark : 'transparent'
+                            },
+                            '&.Mui-disabled': { color: theme.palette.grey[300] },
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {loading ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : <IconSend size={16} />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* File type chips footer — only in expanded mode */}
+          {expanded && (
+            <Box
+              sx={{
+                px: 3,
+                pb: 1.5,
+                pt: 0,
+                bgcolor: '#fff',
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 0.75,
+                flexWrap: 'wrap',
+              }}
+            >
+              {[
+                { label: 'All', count: attachments.length || null },
+                { label: 'Docs' },
+                { label: 'Images' },
+                { label: 'Data' },
+                { label: 'Other' },
+              ].map((item) => (
+                <Chip
+                  key={item.label}
+                  label={item.count ? `${item.label} (${item.count})` : item.label}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    height: 24,
+                    fontSize: '0.7rem',
+                    borderColor: alpha(theme.palette.primary.main, 0.2),
+                    color: theme.palette.grey[600],
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.05),
+                      borderColor: theme.palette.primary.main,
+                    },
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+        </Paper>
+      )}
+
+      {/* Floating Action Button — hidden when expanded */}
+      {!expanded && (
+        <ClickAwayListener onClickAway={() => {}}>
+          <Tooltip title={open ? '' : 'Chat với AI Assistant'} placement="left">
+            <Fab
+              color="primary"
+              onClick={handleToggle}
+              sx={{
+                position: 'fixed',
+                bottom: FAB_MARGIN,
+                right: FAB_MARGIN,
+                zIndex: 1300,
+                width: FAB_SIZE,
+                height: FAB_SIZE,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                background: open
+                  ? theme.palette.grey[600]
+                  : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                '&:hover': {
+                  background: open
+                    ? theme.palette.grey[700]
+                    : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                  boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.5)}`
+                },
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              <Badge
+                color="error"
+                variant="dot"
+                invisible={!hasNewMessage}
+                sx={{ '& .MuiBadge-badge': { top: 4, right: 4 } }}
+              >
+                {open ? <IconX size={24} /> : <IconMessageCircle size={24} />}
+              </Badge>
+            </Fab>
+          </Tooltip>
+        </ClickAwayListener>
+      )}
     </>
   );
 }
