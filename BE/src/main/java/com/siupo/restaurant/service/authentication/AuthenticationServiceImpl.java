@@ -43,6 +43,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
             throw new UnauthorizedException(ErrorCode.INVALID_CREDENTIALS);
         }
+        if (user.getStatus() != EUserStatus.ACTIVE) {
+            throw new UnauthorizedException(ErrorCode.ACCOUNT_DISABLED);
+        }
         LoginResponse response = tokenService.generateAuthResponse(user);
         response.setUser(userMapper.toDto(user));
         return response;
@@ -57,8 +60,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         PendingRegistrationRedis pendingUser = new PendingRegistrationRedis(
                 request.getEmail(),
                 request.getFullName(),
-                request.getPhoneNumber(),
-                passwordEncoder.encode(request.getPassword())
+                passwordEncoder.encode(request.getPassword()),
+                request.getPhoneNumber()
         );
         pendingRegistrationRepository.save(pendingUser);
 
@@ -128,7 +131,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public User processOAuth2User(String email, String name, String picture) {
         Optional<User> existingUser = userRepository.findByEmail(email);
-        if (existingUser.isPresent()) return existingUser.get();
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (user.getStatus() != EUserStatus.ACTIVE) {
+                throw new UnauthorizedException(ErrorCode.ACCOUNT_DISABLED);
+            }
+            return user;
+        }
 
         Customer newCustomer = Customer.builder()
                 .email(email)

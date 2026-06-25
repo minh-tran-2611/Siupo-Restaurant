@@ -78,7 +78,9 @@ export default function SignInPage() {
       }
     } catch (error: unknown) {
       console.error("❌ Login error:", error);
-      showSnackbar(t("signIn.loginError"), "error", 4000);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      const message = axiosError?.response?.data?.message || t("signIn.loginError");
+      showSnackbar(message, "error", 4000);
     }
   };
 

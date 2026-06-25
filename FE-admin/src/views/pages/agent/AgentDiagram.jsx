@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import useAgentEventStream from 'hooks/useAgentEventStream';
+import agentApi from 'api/agentApi';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
@@ -16,10 +17,11 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import FormHelperText from '@mui/material/FormHelperText';
 import CircularProgress from '@mui/material/CircularProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 import { useTheme, alpha } from '@mui/material/styles';
-import { IconX, IconSettings, IconEye, IconEyeOff, IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconX, IconSettings, IconEye, IconEyeOff, IconCheck, IconAlertCircle, IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 
 // design tokens — same source as palette.jsx
 import C from 'assets/scss/_themes-vars.module.scss';
@@ -97,6 +99,27 @@ async function loadModelsFromKey(provider /* , apiKey */) {
   await new Promise((r) => setTimeout(r, 320));
   return MOCK_MODELS[provider] || [];
 }
+
+// ── Vietnamese label + hint map for config fields ─────────────────────────────
+const CONFIG_LABELS = {
+  apiKey:               { label: 'API Key',                  hint: 'Khóa xác thực LLM — bỏ trống nếu server dùng Vertex AI / ADC' },
+  model:                { label: 'Model LLM',                hint: 'Model được dùng để xử lý request của agent này' },
+  botToken:             { label: 'Zalo Bot Token',           hint: 'Access token lấy từ Zalo OA Admin Portal' },
+  webhookSecret:        { label: 'Webhook Secret',           hint: 'Secret xác minh chữ ký webhook từ Zalo' },
+  adminChatId:          { label: 'Admin Chat ID',            hint: 'Chat ID admin nhận thông báo chủ động (xem trong log webhook)' },
+  senderEmail:          { label: 'Email gửi thư',            hint: 'Địa chỉ Gmail dùng để gửi — cần bật 2FA trước' },
+  appPassword:          { label: 'Gmail App Password',       hint: 'Mật khẩu ứng dụng — tạo tại myaccount.google.com/apppasswords' },
+  adminEmail:           { label: 'Email nhận thông báo',     hint: 'Email admin nhận daily report và alert từ hệ thống' },
+  dbUrl:                { label: 'Database URL',             hint: 'Chuỗi kết nối Turso / libSQL' },
+  authToken:            { label: 'Auth Token',               hint: 'Token xác thực — lấy từ Turso dashboard' },
+  tables:               { label: 'Bảng dữ liệu',            hint: 'Danh sách bảng hiện có trong database' },
+  consolidateEveryHours:{ label: 'Chu kỳ consolidate (h)',   hint: 'Tần suất gộp raw memory sang consolidated (mặc định 24h)' },
+  scheduleHours:        { label: 'Chu kỳ lịch (giờ)',        hint: 'Tần suất tự động chạy qua APScheduler' },
+  chunkSize:            { label: 'Chunk size',               hint: 'Số ký tự mỗi đoạn khi tách văn bản để embed' },
+  chunkOverlap:         { label: 'Chunk overlap',            hint: 'Số ký tự lặp giữa các chunk liền kề' },
+  collection:           { label: 'Qdrant collection',        hint: 'Tên collection trong Qdrant lưu dữ liệu crawl' },
+  crawlJobId:           { label: 'Crawl Job ID',             hint: 'ID của APScheduler job — dùng để cancel / reschedule' },
+};
 
 // ── Agent nodes ───────────────────────────────────────────────────────────────
 const AGENTS = [
@@ -182,7 +205,7 @@ const AGENTS = [
   },
   {
     id: 'consolidate', name: 'Consolidate',
-    role: 'Memory Compactor (24h cron)',
+    role: 'Memory Compactor (cron tự động)',
     gradient: [C.secondary200, C.secondary800],
     x: 1079, y: 638, status: 'idle',
     description: 'Cron 24h. Đọc raw_message từ memories table (đã flush từ cache khi evict), 1 LLM call để extract + nén thành nhiều consolidated summary (mỗi entity/topic 1 row), lưu vào consolidated_memories rồi xoá source rows.',
@@ -192,7 +215,38 @@ const AGENTS = [
       'Xoá source rows sau khi consolidate thành công',
       'Trigger định kỳ qua APScheduler',
     ],
-    config: { apiKey: '', model: 'gemini-2.5-flash' },
+    config: { apiKey: '', model: 'gemini-2.5-flash', scheduleHours: 24 },
+    toolsCount: 0,
+    stats: { callsToday: 1 },
+  },
+  {
+    id: 'crawl_agent', name: 'Crawl Agent',
+    role: 'Web Crawler & Qdrant Embedder',
+    gradient: ['#2e7d32', '#145214'],
+    x: 830, y: 638, status: 'idle',
+    description: 'Scheduled background worker. Crawl dữ liệu từ web (menu nhà hàng, đánh giá, tin tức ẩm thực) mỗi 24h, chunk + embed vào Qdrant collection restaurant_knowledge để phục vụ RAG search. Hỗ trợ trigger thủ công qua API.',
+    capabilities: [
+      'Crawl HTML từ danh sách URLs cấu hình sẵn',
+      'Parse + clean text, tách chunk (500 chars, 50 overlap)',
+      'Batch embed qua Embedding model (768-dim)',
+      'Upsert chunks vào Qdrant với metadata URL + timestamp',
+      'Trigger thủ công qua POST /agents/crawl/run',
+      'Log kết quả crawl vào Turso (pages, chunks indexed)',
+    ],
+    config: {
+      targetUrls: [
+        'https://www.foody.vn/ho-chi-minh/chuyen-muc/do-an',
+        'https://www.grab.com/vn/food/',
+        'https://bep.vn/tin-tuc',
+        'https://www.nhahangviet.vn/tin-tuc',
+        'https://www.ngonaz.com/tin-tuc',
+      ],
+      chunkSize: 500,
+      chunkOverlap: 50,
+      collection: 'restaurant_knowledge',
+      scheduleHours: 24,
+      crawlJobId: 'crawl_agent_job',
+    },
     toolsCount: 0,
     stats: { callsToday: 1 },
   },
@@ -397,26 +451,58 @@ const INFRA = [
 ];
 
 const CHANNELS = [
-  { id: 'zalo',  name: 'Zalo',  x: 471, y: 58, r: 22, color: '#00B14F' },
-  { id: 'gmail', name: 'Gmail', x: 929, y: 58, r: 22, color: '#EA4335' },
+  {
+    id: 'zalo', name: 'Zalo', x: 471, y: 58, r: 22, color: '#00B14F',
+    role: 'Messaging channel — nhận & gửi tin nhắn Zalo OA',
+    description: 'Zalo Official Account webhook nhận tin nhắn từ khách hàng và forward sang Orchestrator để xử lý. Hỗ trợ text, hình ảnh và sticker.',
+    capabilities: [
+      'Nhận text / image / sticker từ Zalo OA webhook',
+      'Forward message sang Orchestrator (chat_service.chat)',
+      'Trả lời khách qua Zalo Bot API',
+      'Proactive notification đến admin qua adminChatId',
+    ],
+    config: {
+      botToken: '',
+      webhookSecret: '',
+      adminChatId: '',
+    },
+  },
+  {
+    id: 'gmail', name: 'Gmail', x: 929, y: 58, r: 22, color: '#EA4335',
+    role: 'Notification channel — gửi email thông báo cho admin',
+    description: 'Gmail SMTP gửi email thông báo cho admin khi Orchestrator gọi tool send_email_notification (daily report, alert, v.v.).',
+    capabilities: [
+      'Gửi daily review report qua email',
+      'Gửi alert khi phát hiện sự kiện quan trọng',
+      'Tool send_email_notification khả dụng cho Orchestrator',
+    ],
+    config: {
+      senderEmail: '',
+      appPassword: '',
+      adminEmail: '',
+    },
+  },
 ];
 
 const SCHEDULER_NODE = {
   id: 'scheduler',
   name: 'APScheduler',
-  role: 'Trigger định kỳ — 2 jobs (consolidate 24h + cache cleanup 5m)',
-  description: 'Background scheduler chạy bên trong AiAgent-service (FastAPI lifespan). Quản lý 2 cron job: consolidate_agent_job (24h gộp memories raw) và cache_cleanup_job (5 phút quét cache TTL hết hạn → flush sang Turso qua callback bulk_save_memories).',
+  role: 'Trigger định kỳ — 3 jobs (consolidate 24h + cache 5m + crawl 24h)',
+  description: 'Background scheduler chạy bên trong AiAgent-service (FastAPI lifespan). Quản lý 3 cron job: consolidate_agent_job (24h gộp memories raw), cache_cleanup_job (5 phút quét cache TTL hết hạn → flush sang Turso) và crawl_agent_job (24h crawl web → embed vào Qdrant).',
   capabilities: [
     'Kích hoạt run_consolidate_agent mỗi 24h',
     'Kích hoạt cleanup_expired_with_flush mỗi 5 phút',
+    'Kích hoạt run_crawl_agent mỗi 24h',
     'Đăng ký flush callback lúc startup',
     'Tự dừng khi FastAPI shutdown',
   ],
   config: {
-    intervalHours: 24,
+    consolidateHours: 24,
     cacheCleanupMinutes: 5,
+    crawlHours: 24,
     consolidateJobId: 'consolidate_agent_job',
     cacheCleanupJobId: 'cache_cleanup_job',
+    crawlJobId: 'crawl_agent_job',
     triggerType: 'interval',
   },
   x: 1265, y: 612, r: 19,
@@ -448,12 +534,16 @@ const CONNECTIONS = [
   // Cache flush + consolidate
   { from: 'cache',            to: 'turso',            type: 'infra',     fR: 28, tR: 28 },
   { from: 'consolidate',      to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
-  // Scheduler triggers (2 jobs)
+  // Scheduler triggers (3 jobs)
   { from: 'scheduler',        to: 'consolidate',      type: 'scheduled', fR: 19, tR: 52 },
   { from: 'scheduler',        to: 'cache',            type: 'scheduled', fR: 19, tR: 28 },
-  // Future channels
-  { from: 'zalo',             to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
-  { from: 'gmail',            to: 'orchestrator',     type: 'future',    fR: 22, tR: 52 },
+  { from: 'scheduler',        to: 'crawl_agent',      type: 'scheduled', fR: 19, tR: 52 },
+  // Crawl agent outputs
+  { from: 'crawl_agent',      to: 'qdrant',           type: 'infra',     fR: 52, tR: 28 },
+  { from: 'crawl_agent',      to: 'turso',            type: 'infra',     fR: 52, tR: 28 },
+  // Channel connections
+  { from: 'zalo',             to: 'orchestrator',     type: 'primary',   fR: 22, tR: 52 },
+  { from: 'gmail',            to: 'orchestrator',     type: 'secondary', fR: 22, tR: 52 },
 ];
 
 const NODE_MAP = {};
@@ -533,6 +623,24 @@ function AgentIcon({ id }) {
         <path d="M-10,2 Q-8,8 0,11" fill="none" stroke={m} strokeWidth="2" strokeLinecap="round" />
         <path d="M10,2 Q8,8 0,11" fill="none" stroke={m} strokeWidth="2" strokeLinecap="round" />
         <circle cx="-10" cy="2" r="2.5" fill={s} /><circle cx="10" cy="2" r="2.5" fill={s} /><circle cx="0" cy="11" r="3" fill={w} />
+      </g>
+    );
+    case 'crawl_agent': return (
+      <g>
+        {/* Globe outline */}
+        <circle cx="0" cy="-2" r="9.5" fill="none" stroke={w} strokeWidth="1.4" />
+        {/* Latitude lines */}
+        <line x1="-9.5" y1="-2" x2="9.5" y2="-2" stroke={m} strokeWidth="0.9" />
+        <line x1="-8" y1="-6" x2="8" y2="-6" stroke={m} strokeWidth="0.7" />
+        <line x1="-8" y1="2" x2="8" y2="2" stroke={m} strokeWidth="0.7" />
+        {/* Meridian */}
+        <ellipse cx="0" cy="-2" rx="4.5" ry="9.5" fill="none" stroke={m} strokeWidth="0.9" />
+        {/* Scan cursor on globe */}
+        <circle cx="6" cy="-8" r="2.2" fill={w} />
+        <line x1="0" y1="-2" x2="6" y2="-8" stroke={w} strokeWidth="1.4" strokeLinecap="round" />
+        {/* Embed arrow down — data flowing into Qdrant */}
+        <line x1="0" y1="8" x2="0" y2="13" stroke={w} strokeWidth="1.8" strokeLinecap="round" />
+        <polyline points="-3.5,10 0,13.5 3.5,10" fill="none" stroke={w} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </g>
     );
     default: return null;
@@ -790,20 +898,25 @@ function InfraNode({ node, isHovered, isLinked, onHover, onLeave, onClick }) {
 }
 
 // ── Channel & Scheduler ───────────────────────────────────────────────────────
-function ChannelNode({ node }) {
+function ChannelNode({ node, isHovered, onHover, onLeave, onClick }) {
   return (
-    <g style={{ pointerEvents: 'none' }}>
+    <g onMouseEnter={onHover} onMouseLeave={onLeave} onClick={onClick} style={{ cursor: 'pointer' }}>
       <defs>
         <radialGradient id={`chg-${node.id}`} cx="35%" cy="30%" r="70%">
           <stop offset="0%" stopColor={node.color} stopOpacity="0.55" />
           <stop offset="100%" stopColor={node.color} stopOpacity="0.28" />
         </radialGradient>
+        <filter id={`chglow-${node.id}`} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation={isHovered ? 5 : 3} result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
       </defs>
-      <circle cx={node.x} cy={node.y} r={node.r + 5} fill="none" stroke={node.color} strokeWidth="1" strokeDasharray="4 4" opacity="0.42" />
-      <circle cx={node.x} cy={node.y} r={node.r} fill={`url(#chg-${node.id})`} stroke={node.color} strokeWidth="1.2" opacity="0.7" />
-      <text x={node.x} y={node.y + 4} textAnchor="middle" fill="rgba(255,255,255,0.92)" fontSize="8" fontWeight="700" fontFamily="Roboto,sans-serif">{node.name}</text>
-      <rect x={node.x - 12} y={node.y + node.r + 4} width={24} height={11} rx={5.5} fill={node.color} opacity="0.65" />
-      <text x={node.x} y={node.y + node.r + 12} textAnchor="middle" fill="rgba(255,255,255,0.95)" fontSize="6.2" fontWeight="700" fontFamily="Roboto,sans-serif">SOON</text>
+      <circle cx={node.x} cy={node.y} r={node.r + 5} fill="none" stroke={node.color} strokeWidth="1" strokeDasharray="4 4"
+        opacity={isHovered ? 0.75 : 0.42} style={{ pointerEvents: 'none' }} />
+      <circle cx={node.x} cy={node.y} r={node.r} fill={`url(#chg-${node.id})`} filter={`url(#chglow-${node.id})`}
+        stroke={isHovered ? 'rgba(255,255,255,0.85)' : node.color}
+        strokeWidth={isHovered ? 2 : 1.2} opacity={isHovered ? 1 : 0.85} />
+      <text x={node.x} y={node.y + 4} textAnchor="middle" fill="rgba(255,255,255,0.92)" fontSize="8" fontWeight="700" fontFamily="Roboto,sans-serif" style={{ pointerEvents: 'none' }}>{node.name}</text>
     </g>
   );
 }
@@ -824,7 +937,7 @@ function SchedulerNode({ node, isHovered, onHover, onLeave, onClick }) {
       <line x1={node.x} y1={node.y} x2={node.x + node.r - 7} y2={node.y} stroke={amber} strokeWidth="1.3" strokeLinecap="round" style={{ pointerEvents: 'none' }} />
       <circle cx={node.x} cy={node.y} r="1.8" fill={amber} style={{ pointerEvents: 'none' }} />
       <text x={node.x} y={node.y + node.r + 13} textAnchor="middle" fill={amber} fontSize="7.5" fontWeight="700" fontFamily="'Roboto Mono',monospace" style={{ pointerEvents: 'none' }}>
-        {node.config?.intervalHours || 24}h · {node.config?.cacheCleanupMinutes || 5}m
+        3 jobs · 24h · 5m · 24h
       </text>
     </g>
   );
@@ -873,7 +986,7 @@ function NodeTooltipContent({ name, role, status, configKeys }) {
       )}
 
       <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)', mt: 0.8, fontStyle: 'italic' }}>
-        Click để cấu hình
+        {configKeys?.includes('crawlJobId') ? 'Click để xem chi tiết & trigger' : 'Click để cấu hình'}
       </Typography>
     </Box>
   );
@@ -931,14 +1044,14 @@ function AgentConfigForm({ apiKey, provider, model, models, loadingModels, showK
         )}
         {!apiKey && (
           <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontStyle: 'italic' }}>
-            Nhập API key để load model list từ provider.
+            API Key tùy chọn — bỏ trống nếu server dùng Vertex AI / ADC. Nhập key để tự động nhận diện provider và load model list.
           </Typography>
         )}
       </Box>
 
       {/* Provider dropdown — only when key prefix didn't match any known provider */}
       {!providerLocked && (
-        <FormControl fullWidth size="small" sx={{ mt: 1.6 }} disabled={!apiKey}>
+        <FormControl fullWidth size="small" sx={{ mt: 1.6 }}>
           <InputLabel>Provider</InputLabel>
           <Select label="Provider" value={provider || ''} onChange={onProviderChange}>
             {PROVIDERS.map((p) => (
@@ -950,6 +1063,7 @@ function AgentConfigForm({ apiKey, provider, model, models, loadingModels, showK
               </MenuItem>
             ))}
           </Select>
+          <FormHelperText>Chọn provider để load danh sách model tương ứng</FormHelperText>
         </FormControl>
       )}
 
@@ -971,10 +1085,11 @@ function AgentConfigForm({ apiKey, provider, model, models, loadingModels, showK
             </MenuItem>
           ))}
         </Select>
+        <FormHelperText>Model LLM sử dụng cho agent này — bắt buộc để lưu cấu hình</FormHelperText>
       </FormControl>
 
       <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary', mt: 1.2, fontStyle: 'italic' }}>
-        Model list được load từ provider sau khi nhập API key hợp lệ.
+        Nếu dùng Vertex AI: chọn provider Google → chọn model → lưu (không cần API key).
       </Typography>
     </Box>
   );
@@ -990,10 +1105,54 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
   const [models, setModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  // Consolidate schedule state
+  const [scheduleHours, setScheduleHours] = useState('24');
+  // Crawl agent state
+  const [crawlTriggering, setCrawlTriggering] = useState(false);
+  const [crawlResult, setCrawlResult] = useState(null);
+  const [crawlUrls, setCrawlUrls] = useState([]);
+  const [urlInput, setUrlInput] = useState('');
+  const [loadingUrls, setLoadingUrls] = useState(false);
+  const [savingCrawl, setSavingCrawl] = useState(false);
+
+  const handleAddUrl = () => {
+    const trimmed = urlInput.trim();
+    if (trimmed && !crawlUrls.includes(trimmed)) {
+      setCrawlUrls((prev) => [...prev, trimmed]);
+    }
+    setUrlInput('');
+  };
+
+  const handleRemoveUrl = (idx) => {
+    setCrawlUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleTriggerCrawl = async () => {
+    setCrawlTriggering(true);
+    setCrawlResult(null);
+    try {
+      const res = await agentApi.triggerCrawl();
+      setCrawlResult({ ok: true, message: res.message || 'Crawl đã được trigger thành công!' });
+    } catch (e) {
+      const detail = e?.response?.data?.detail || 'Không thể trigger crawl. Kiểm tra lại server.';
+      setCrawlResult({ ok: false, message: detail });
+    } finally {
+      setCrawlTriggering(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setCrawlResult(null);
+      setUrlInput('');
+      setSavingCrawl(false);
+      setLoadingUrls(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !node) return;
-    if (kind === 'agent') {
+    if (kind === 'agent' || kind === 'crawl' || kind === 'consolidate') {
       const initApiKey = node.config?.apiKey || '';
       const initModel  = node.config?.model  || '';
       setApiKey(initApiKey);
@@ -1013,6 +1172,26 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
       } else {
         setModels([]);
       }
+
+      if (kind === 'consolidate') {
+        setScheduleHours(String(node.config?.scheduleHours ?? 24));
+      }
+
+      if (kind === 'crawl') {
+        setUrlInput('');
+        setLoadingUrls(true);
+        agentApi
+          .getCrawlConfig()
+          .then((res) => {
+            setCrawlUrls(Array.isArray(res?.urls) ? res.urls : []);
+          })
+          .catch(() => {
+            // Fallback to node defaults if backend unreachable
+            const saved = node.config?.targetUrls;
+            setCrawlUrls(Array.isArray(saved) ? saved : []);
+          })
+          .finally(() => setLoadingUrls(false));
+      }
     } else {
       setDraft({ ...(node.config || {}) });
     }
@@ -1020,7 +1199,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
 
   if (!node) return null;
 
-  const accent = node.gradient?.[0] || node.grad?.[0] || C.primaryMain;
+  const accent = node.gradient?.[0] || node.grad?.[0] || node.color || C.primaryMain;
   const status = node.status;
   const statusColor = status ? STATUS_COLOR[status] : null;
 
@@ -1066,7 +1245,29 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
 
   const handleModelChange = (e) => setModel(e.target.value);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (kind === 'crawl') {
+      // Persist URLs to backend; key/model still goes through the mock onSave.
+      setSavingCrawl(true);
+      setCrawlResult(null);
+      try {
+        const res = await agentApi.saveCrawlConfig(crawlUrls);
+        if (Array.isArray(res?.urls)) setCrawlUrls(res.urls);
+        onSave?.(node.id, { apiKey, model, targetUrls: res?.urls || crawlUrls });
+        onClose();
+      } catch (e) {
+        const detail = e?.response?.data?.detail || 'Không thể lưu URLs. Kiểm tra lại server.';
+        setCrawlResult({ ok: false, message: detail });
+      } finally {
+        setSavingCrawl(false);
+      }
+      return;
+    }
+    if (kind === 'consolidate') {
+      onSave?.(node.id, { apiKey, model, scheduleHours: Number(scheduleHours) || 24 });
+      onClose();
+      return;
+    }
     if (kind === 'agent') {
       onSave?.(node.id, { apiKey, model });
     } else {
@@ -1075,8 +1276,8 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
     onClose();
   };
 
-  // Save button validation
-  const canSave = kind === 'agent' ? !!(apiKey && model) : true;
+  // apiKey is optional (server may use Vertex AI / ADC) — only model is required
+  const canSave = (kind === 'agent' || kind === 'consolidate') ? !!model : true;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
@@ -1125,7 +1326,7 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
           </Box>
         )}
 
-        {/* Configuration — agents use key+model form, others use generic textfield loop */}
+        {/* Configuration — agents use key+model form, crawl uses trigger panel, others use generic textfield loop */}
         {kind === 'agent' ? (
           <Box sx={{ mb: node.stats ? 2.5 : 0 }}>
             <AgentConfigForm
@@ -1135,6 +1336,155 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
               onProviderChange={handleProviderChange}
               onModelChange={handleModelChange}
               onToggleShowKey={() => setShowKey((s) => !s)}
+            />
+          </Box>
+        ) : kind === 'crawl' ? (
+          <Box>
+            {/* LLM config — same as other agents */}
+            <Box sx={{ mb: 2.5 }}>
+              <AgentConfigForm
+                apiKey={apiKey} provider={provider} model={model}
+                models={models} loadingModels={loadingModels} showKey={showKey}
+                onApiKeyChange={handleApiKeyChange}
+                onProviderChange={handleProviderChange}
+                onModelChange={handleModelChange}
+                onToggleShowKey={() => setShowKey((s) => !s)}
+              />
+            </Box>
+
+            {/* Target URLs section */}
+            <Divider sx={{ my: 2 }} />
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
+              Target URLs ({crawlUrls.length})
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1.2, maxHeight: 180, overflowY: 'auto', pr: 0.5 }}>
+              {loadingUrls ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                  <CircularProgress size={14} sx={{ color: '#2e7d32' }} />
+                  <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Đang tải URLs…</Typography>
+                </Box>
+              ) : crawlUrls.length === 0 ? (
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontStyle: 'italic', py: 0.5 }}>
+                  Chưa có URL nào. Thêm URL bên dưới.
+                </Typography>
+              ) : crawlUrls.map((url, idx) => (
+                <Box key={idx} sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  py: 0.6, px: 1, borderRadius: 1,
+                  bgcolor: alpha('#2e7d32', 0.06),
+                  border: `1px solid ${alpha('#2e7d32', 0.18)}`,
+                }}>
+                  <Typography sx={{
+                    flex: 1, fontSize: '0.71rem', color: 'text.primary',
+                    wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.5,
+                  }}>
+                    {url}
+                  </Typography>
+                  <IconButton size="small" onClick={() => handleRemoveUrl(idx)}
+                    sx={{ color: '#c62828', p: 0.3, flexShrink: 0, '&:hover': { bgcolor: alpha('#c62828', 0.08) } }}>
+                    <IconX size={13} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                size="small" fullWidth
+                placeholder="https://example.com/page"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl(); } }}
+                sx={{ '& .MuiInputBase-input': { fontSize: '0.78rem', fontFamily: 'monospace' } }}
+              />
+              <Button
+                variant="outlined" size="small"
+                onClick={handleAddUrl}
+                disabled={!urlInput.trim()}
+                sx={{
+                  borderColor: '#2e7d32', color: '#2e7d32', whiteSpace: 'nowrap', px: 2,
+                  '&:hover': { borderColor: '#1b5e20', bgcolor: alpha('#2e7d32', 0.07) },
+                  '&:disabled': { borderColor: 'divider' },
+                }}
+              >
+                Thêm
+              </Button>
+            </Box>
+
+            {/* Manual trigger section */}
+            <Divider sx={{ my: 2 }} />
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
+              Trigger thủ công
+            </Typography>
+            <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mb: 1.5, lineHeight: 1.6 }}>
+              Chạy crawl ngay lập tức, không cần chờ schedule {node.config?.scheduleHours || 24}h. Agent sẽ crawl các URLs đã cấu hình, chunk + embed vào Qdrant.
+            </Typography>
+
+            {crawlResult && (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 1, mb: 1.5,
+                p: 1.2, borderRadius: 1,
+                bgcolor: alpha(crawlResult.ok ? '#2e7d32' : '#c62828', 0.10),
+                border: `1px solid ${alpha(crawlResult.ok ? '#2e7d32' : '#c62828', 0.30)}`,
+              }}>
+                {crawlResult.ok
+                  ? <IconCheck size={16} color="#2e7d32" />
+                  : <IconAlertCircle size={16} color="#c62828" />}
+                <Typography sx={{ fontSize: '0.78rem', color: crawlResult.ok ? '#2e7d32' : '#c62828', fontWeight: 500 }}>
+                  {crawlResult.message}
+                </Typography>
+              </Box>
+            )}
+
+            <Button
+              variant="contained"
+              startIcon={crawlTriggering ? <CircularProgress size={16} color="inherit" /> : <IconPlayerPlay size={16} />}
+              onClick={handleTriggerCrawl}
+              disabled={crawlTriggering}
+              fullWidth
+              sx={{
+                py: 1.2, bgcolor: '#2e7d32',
+                '&:hover': { bgcolor: '#1b5e20' },
+                '&:disabled': { bgcolor: alpha('#2e7d32', 0.4) },
+                fontWeight: 700, fontSize: '0.88rem',
+              }}
+            >
+              {crawlTriggering ? 'Đang crawl…' : 'Trigger Crawl Ngay'}
+            </Button>
+            <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary', mt: 0.8, fontStyle: 'italic', textAlign: 'center' }}>
+              Crawl tự động chạy mỗi {node.config?.scheduleHours || 24}h qua APScheduler
+            </Typography>
+          </Box>
+        ) : kind === 'consolidate' ? (
+          <Box>
+            <AgentConfigForm
+              apiKey={apiKey} provider={provider} model={model}
+              models={models} loadingModels={loadingModels} showKey={showKey}
+              onApiKeyChange={handleApiKeyChange}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+              onToggleShowKey={() => setShowKey((s) => !s)}
+            />
+            <Divider sx={{ my: 2 }} />
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.5px', mb: 1 }}>
+              Lịch chạy tự động
+            </Typography>
+            <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mb: 1.5, lineHeight: 1.6 }}>
+              Consolidate gộp raw memories sang consolidated_memories theo định kỳ. APScheduler sẽ tự restart job với interval mới sau khi lưu.
+            </Typography>
+            <TextField
+              label="Chu kỳ (giờ)"
+              type="number"
+              size="small"
+              value={scheduleHours}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '' || (Number(v) >= 1 && Number(v) <= 720)) setScheduleHours(v);
+              }}
+              inputProps={{ min: 1, max: 720, style: { fontFamily: 'monospace', fontSize: '0.9rem' } }}
+              helperText="Khoảng cách giữa 2 lần chạy consolidate (1–720 giờ, mặc định 24h)"
+              sx={{ width: 220 }}
             />
           </Box>
         ) : kind === 'scheduler' ? Object.keys(draft).length > 0 && (
@@ -1172,12 +1522,19 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
               Configuration
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
-              {Object.entries(draft).map(([key, value]) => (
-                <TextField key={key} label={key} value={value ?? ''} onChange={handleDraftChange(key)}
-                  size="small" fullWidth variant="outlined"
-                  InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.78rem' } }}
-                  inputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }} />
-              ))}
+              {Object.entries(draft).map(([key, value]) => {
+                const meta = CONFIG_LABELS[key];
+                return (
+                  <TextField key={key}
+                    label={meta?.label || key}
+                    value={value ?? ''} onChange={handleDraftChange(key)}
+                    size="small" fullWidth variant="outlined"
+                    helperText={meta?.hint}
+                    InputLabelProps={{ sx: { fontSize: '0.78rem' } }}
+                    inputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.82rem' } }}
+                    FormHelperTextProps={{ sx: { fontSize: '0.65rem', mt: 0.3 } }} />
+                );
+              })}
             </Box>
           </Box>
         )}
@@ -1255,10 +1612,12 @@ function NodeConfigDialog({ node, kind, open, onClose, onSave }) {
           </Button>
         ) : (
           <>
-            <Button onClick={onClose} color="inherit">Hủy</Button>
-            <Button onClick={handleSave} variant="contained" disabled={!canSave}
-              sx={{ bgcolor: accent, '&:hover': { bgcolor: alpha(accent, 0.85) } }}>
-              Lưu cấu hình
+            <Button onClick={onClose} color="inherit" disabled={savingCrawl}>Hủy</Button>
+            <Button onClick={handleSave} variant="contained"
+              disabled={!canSave || savingCrawl}
+              startIcon={kind === 'crawl' && savingCrawl ? <CircularProgress size={15} color="inherit" /> : null}
+              sx={{ bgcolor: kind === 'crawl' ? '#2e7d32' : accent, '&:hover': { bgcolor: kind === 'crawl' ? '#1b5e20' : alpha(accent, 0.85) } }}>
+              {kind === 'crawl' && savingCrawl ? 'Đang lưu…' : 'Lưu cấu hình'}
             </Button>
           </>
         )}
@@ -1427,8 +1786,25 @@ export default function AgentDiagram() {
           </Tooltip>
         ))}
 
-        {/* Channels — passive */}
-        {CHANNELS.map((ch) => <ChannelNode key={ch.id} node={ch} />)}
+        {/* Channels — interactive */}
+        {CHANNELS.map((ch) => (
+          <Tooltip
+            key={ch.id}
+            title={<NodeTooltipContent name={ch.name} role={ch.role} configKeys={Object.keys(ch.config || {})} />}
+            placement="bottom" arrow enterDelay={150} leaveDelay={50}
+            componentsProps={{ tooltip: { sx: tooltipSx } }}
+          >
+            <g>
+              <ChannelNode
+                node={ch}
+                isHovered={hoveredId === ch.id}
+                onHover={() => setHoveredId(ch.id)}
+                onLeave={() => setHoveredId(null)}
+                onClick={() => openDialog(ch, 'channel')}
+              />
+            </g>
+          </Tooltip>
+        ))}
 
         {/* Scheduler — interactive */}
         <Tooltip
@@ -1451,6 +1827,7 @@ export default function AgentDiagram() {
         {/* Agent nodes — status comes from live event stream, default 'idle' */}
         {AGENTS.map((agent) => {
           const liveAgent = { ...agent, status: agentStatusMap[agent.id] || 'idle' };
+          const dialogKind = agent.id === 'crawl_agent' ? 'crawl' : agent.id === 'consolidate' ? 'consolidate' : 'agent';
           return (
             <Tooltip
               key={agent.id}
@@ -1465,7 +1842,7 @@ export default function AgentDiagram() {
                   isInFlow={false}
                   onHover={() => setHoveredId(agent.id)}
                   onLeave={() => setHoveredId(null)}
-                  onClick={() => openDialog(liveAgent, 'agent')}
+                  onClick={() => openDialog(liveAgent, dialogKind)}
                 />
               </g>
             </Tooltip>

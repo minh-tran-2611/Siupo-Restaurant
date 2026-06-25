@@ -32,7 +32,7 @@ function AgentHeroCard() {
   const theme = useTheme();
 
   const stats = [
-    { value: '6 / 6', label: 'Agents Online', icon: IconRobot },
+    { value: '7 / 7', label: 'Agents Online', icon: IconRobot },
     { value: '8', label: 'Tasks Today', icon: IconListCheck },
     { value: '67', label: 'Tools Available', icon: IconCpu }
   ];
@@ -167,7 +167,7 @@ export default function AgentManagement() {
 
   const diagramSecondary = (
     <Chip
-      label="Click node để xem chi tiết"
+      label="Click node để xem chi tiết & cấu hình"
       size="small"
       sx={{
         bgcolor: alpha(theme.palette.primary.main, 0.08),

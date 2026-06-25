@@ -21,8 +21,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     
     // Analytics queries
     List<Order> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
-    
+
     List<Order> findByStatusAndCreatedAtBetween(EOrderStatus status, LocalDateTime startDate, LocalDateTime endDate);
+
     
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status AND o.createdAt BETWEEN :startDate AND :endDate")
     Long countByStatusAndDateRange(@Param("status") EOrderStatus status, 

@@ -21,6 +21,7 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Avatar from '@mui/material/Avatar';
 import ListItemText from '@mui/material/ListItemText';
@@ -132,7 +133,9 @@ const NotificationManagement = () => {
 
   const filteredUsers = useMemo(() => {
     const q = userSearchTerm.toLowerCase();
-    return users.filter((u) => (u.fullName || u.email || '').toLowerCase().includes(q));
+    return users.filter(
+      (u) => (u.fullName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+    );
   }, [users, userSearchTerm]);
 
   const filteredNotifications = useMemo(() => {
@@ -281,11 +284,13 @@ const NotificationManagement = () => {
                         </ListItem>
                       ) : (
                         filteredUsers.map((u) => (
-                          <ListItem key={u.id} button selected={formData.userId === u.id} onClick={() => handleSelectUser(u.id)}>
-                            <ListItemAvatar>
-                              <Avatar>{(u.fullName || 'U').charAt(0).toUpperCase()}</Avatar>
-                            </ListItemAvatar>
-                            <ListItemText primary={u.fullName || 'Unnamed'} secondary={u.email} />
+                          <ListItem key={u.id} disablePadding>
+                            <ListItemButton selected={formData.userId === u.id} onClick={() => handleSelectUser(u.id)}>
+                              <ListItemAvatar>
+                                <Avatar>{(u.fullName || 'U').charAt(0).toUpperCase()}</Avatar>
+                              </ListItemAvatar>
+                              <ListItemText primary={u.fullName || 'Unnamed'} secondary={u.email} />
+                            </ListItemButton>
                           </ListItem>
                         ))
                       )}

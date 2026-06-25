@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -147,37 +148,54 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     @Cacheable(value = "analytics-products", key = "#request.period + '-' + #limit", unless = "#result == null")
     public ProductAnalyticsResponse getProductAnalytics(AnalyticsRequest request, Integer limit) {
         DateRange range = getDateRange(request);
-        
+
         // Get completed orders only
         List<Order> completedOrders = orderRepository.findByStatusAndCreatedAtBetween(
                 EOrderStatus.COMPLETED, range.start, range.end);
         
-        // Calculate product statistics
-        Map<Long, ProductStats> productStatsMap = new HashMap<>();
-        
+        // Calculate product/combo statistics using "P_{id}" / "C_{id}" keys to avoid ID collision
+        Map<String, ProductStats> productStatsMap = new HashMap<>();
+
         for (Order order : completedOrders) {
             if (order.getItems() != null) {
                 for (OrderItem item : order.getItems()) {
-                    Long productId = item.getProduct().getId();
-                    
-                    productStatsMap.putIfAbsent(productId, new ProductStats(
-                            productId,
-                            item.getProduct().getName(),
-                            item.getProduct().getImages() != null && !item.getProduct().getImages().isEmpty() 
-                                ? item.getProduct().getImages().get(0).getUrl() : null
-                    ));
-                    
-                    ProductStats stats = productStatsMap.get(productId);
-                    stats.totalQuantity += item.getQuantity().intValue();
-                    stats.totalRevenue += item.getPrice() * item.getQuantity();
-                    stats.orderCount += 1;
+                    String key;
+                    ProductStats entry;
+
+                    if (item.getProduct() != null) {
+                        key = "P_" + item.getProduct().getId();
+                        productStatsMap.putIfAbsent(key, new ProductStats(
+                                item.getProduct().getId(),
+                                item.getProduct().getName(),
+                                item.getProduct().getImages() != null && !item.getProduct().getImages().isEmpty()
+                                        ? item.getProduct().getImages().get(0).getUrl() : null,
+                                "PRODUCT"
+                        ));
+                    } else if (item.getCombo() != null) {
+                        key = "C_" + item.getCombo().getId();
+                        productStatsMap.putIfAbsent(key, new ProductStats(
+                                item.getCombo().getId(),
+                                item.getCombo().getName(),
+                                item.getCombo().getImages() != null && !item.getCombo().getImages().isEmpty()
+                                        ? item.getCombo().getImages().get(0).getUrl() : null,
+                                "COMBO"
+                        ));
+                    } else {
+                        continue;
+                    }
+
+                    entry = productStatsMap.get(key);
+                    entry.totalQuantity += item.getQuantity().intValue();
+                    entry.totalRevenue += item.getPrice() * item.getQuantity();
+                    entry.orderCount += 1;
                 }
             }
         }
-        
+
         // Convert to list and sort
         List<TopProductResponse> allProducts = productStatsMap.values().stream()
                 .map(stats -> TopProductResponse.builder()
@@ -188,6 +206,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                         .totalRevenue(stats.totalRevenue)
                         .orderCount(stats.orderCount)
                         .averagePrice(stats.totalQuantity > 0 ? stats.totalRevenue / stats.totalQuantity : 0.0)
+                        .type(stats.type)
                         .build())
                 .collect(Collectors.toList());
         
@@ -583,14 +602,16 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Long productId;
         String productName;
         String imageUrl;
+        String type; // "PRODUCT" or "COMBO"
         Integer totalQuantity = 0;
         Double totalRevenue = 0.0;
         Integer orderCount = 0;
-        
-        ProductStats(Long productId, String productName, String imageUrl) {
+
+        ProductStats(Long productId, String productName, String imageUrl, String type) {
             this.productId = productId;
             this.productName = productName;
             this.imageUrl = imageUrl;
+            this.type = type;
         }
     }
     

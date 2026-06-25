@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/tags/**").permitAll()
                         .requestMatchers("/api/vouchers/**").permitAll()
                         .requestMatchers("/api/page/**").permitAll()
+                        .requestMatchers("/api/place-table-for-guest/**").permitAll()
 
                         // Roles based access control
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

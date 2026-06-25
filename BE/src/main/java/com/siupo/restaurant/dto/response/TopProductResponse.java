@@ -18,4 +18,5 @@ public class TopProductResponse {
     private Integer orderCount;
     private Double averagePrice;
     private Integer rank;
+    private String type; // "PRODUCT" or "COMBO"
 }

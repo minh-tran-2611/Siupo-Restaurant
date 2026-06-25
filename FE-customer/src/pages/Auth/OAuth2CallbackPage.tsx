@@ -15,7 +15,6 @@ export default function OAuth2CallbackPage() {
   useEffect(() => {
     const processOAuth2Callback = async () => {
       const accessToken = searchParams.get("accessToken");
-      const refreshToken = searchParams.get("refreshToken");
       const email = searchParams.get("email");
       const error = searchParams.get("error");
       const errorMessage = searchParams.get("message");
@@ -28,12 +27,10 @@ export default function OAuth2CallbackPage() {
         return;
       }
 
-      // Handle success case
-      if (accessToken && refreshToken && email) {
+      // Handle success case (refreshToken now in HttpOnly cookie, not URL)
+      if (accessToken && email) {
         try {
-          // Save tokens first
           localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem("refreshToken", refreshToken);
 
           // Get user info
           const userInfo = await authService.getCurrentUser();

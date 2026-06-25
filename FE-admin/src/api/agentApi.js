@@ -35,7 +35,32 @@ const agentApi = {
   /**
    * URL của SSE event stream (dùng trực tiếp với EventSource).
    */
-  eventsUrl: () => `${AI_AGENT_BASE_URL.replace(/\/$/, '')}/agents/events`
+  eventsUrl: () => `${AI_AGENT_BASE_URL.replace(/\/$/, '')}/agents/events`,
+
+  /**
+   * Trigger crawl thủ công — chạy ngay crawl_agent_job mà không cần đợi schedule.
+   * @returns {Promise<{ status: string, message: string }>}
+   */
+  triggerCrawl: () => aiAgentClient.post('/agents/crawl/run').then((res) => res.data),
+
+  /**
+   * Trạng thái lần crawl gần nhất (last_run, status, pages_crawled, chunks_indexed).
+   * @returns {Promise<{ last_run: string|null, status: string, pages_crawled: number, chunks_indexed: number, next_run: string|null }>}
+   */
+  getCrawlStatus: () => aiAgentClient.get('/agents/crawl/status').then((res) => res.data),
+
+  /**
+   * Lấy danh sách URLs hiện tại mà crawl agent sẽ fetch.
+   * @returns {Promise<{ urls: string[] }>}
+   */
+  getCrawlConfig: () => aiAgentClient.get('/agents/crawl/config').then((res) => res.data),
+
+  /**
+   * Lưu danh sách URLs mới cho crawl agent.
+   * @param {string[]} urls
+   * @returns {Promise<{ status: string, urls: string[], message: string }>}
+   */
+  saveCrawlConfig: (urls) => aiAgentClient.put('/agents/crawl/config', { urls }).then((res) => res.data)
 };
 
 export default agentApi;

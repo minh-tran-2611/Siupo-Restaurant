@@ -77,16 +77,20 @@ axiosClient.interceptors.response.use(
 
     // ----- Handle 401 (Unauthorized) + Refresh token -----
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Skip retry for refresh-token endpoint itself to avoid infinite loop
-      if (originalRequest.url?.includes('/auth/refresh-token')) {
-        console.error(`❌ [${reqId}] Refresh token expired - Logging out`);
+      // Skip retry for auth endpoints — login failure is not a session expiry
+      if (
+        originalRequest.url?.includes('/auth/refresh-token') ||
+        originalRequest.url?.includes('/auth/login')
+      ) {
+        console.error(`❌ [${reqId}] Auth endpoint returned 401 - not retrying`);
         isRefreshing = false;
-        subscribers = []; // Clear all waiting requests
+        subscribers = [];
 
-        // Only handle session expired once
-        if (!isSessionExpired) {
-          isSessionExpired = true;
-          handleSessionExpired();
+        if (originalRequest.url?.includes('/auth/refresh-token')) {
+          if (!isSessionExpired) {
+            isSessionExpired = true;
+            handleSessionExpired();
+          }
         }
         return Promise.reject(error);
       }

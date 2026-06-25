@@ -3,6 +3,8 @@ package com.siupo.restaurant.service.notifications;
 import com.siupo.restaurant.dto.request.CreateNotificationRequest;
 import com.siupo.restaurant.dto.response.NotificationResponse;
 import com.siupo.restaurant.enums.ENotificationStatus;
+import com.siupo.restaurant.exception.base.ErrorCode;
+import com.siupo.restaurant.exception.business.NotFoundException;
 import com.siupo.restaurant.model.NotificationReadStatus;
 import com.siupo.restaurant.model.User;
 import com.siupo.restaurant.model.UserNotification;
@@ -81,7 +83,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Transactional
     public NotificationResponse markAsRead(Long notificationId, Long userId) {
         UserNotification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.INTERNAL_ERROR));
 
         if (notification.getIsGlobal()) {
             // Global notification: lưu vào tracking table
@@ -90,7 +92,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
                     .orElse(NotificationReadStatus.builder()
                             .notification(notification)
                             .user(userRepository.findById(userId)
-                                    .orElseThrow(() -> new RuntimeException("User not found")))
+                                    .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND)))
                             .build());
 
             if (readStatus.getStatus() == ENotificationStatus.DELETED) {
@@ -114,7 +116,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
             // Personal notification: update trực tiếp
             UserNotification personalNotif = notificationRepository
                     .findByIdAndUserId(notificationId, userId)
-                    .orElseThrow(() -> new RuntimeException("Notification not found or access denied"));
+                    .orElseThrow(() -> new NotFoundException(ErrorCode.INTERNAL_ERROR));
 
             if (personalNotif.getStatus() == ENotificationStatus.DELETED) {
                 throw new RuntimeException("Cannot read deleted notification");
@@ -131,7 +133,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Transactional
     public void deleteNotification(Long notificationId, Long userId) {
         UserNotification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.INTERNAL_ERROR));
 
         if (notification.getIsGlobal()) {
             // Global notification: đánh dấu DELETED trong tracking table
@@ -140,7 +142,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
                     .orElse(NotificationReadStatus.builder()
                             .notification(notification)
                             .user(userRepository.findById(userId)
-                                    .orElseThrow(() -> new RuntimeException("User not found")))
+                                    .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND)))
                             .build());
 
             readStatus.setStatus(ENotificationStatus.DELETED);
@@ -150,7 +152,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
             // Personal notification: update trực tiếp
             UserNotification personalNotif = notificationRepository
                     .findByIdAndUserId(notificationId, userId)
-                    .orElseThrow(() -> new RuntimeException("Notification not found or access denied"));
+                    .orElseThrow(() -> new NotFoundException(ErrorCode.INTERNAL_ERROR));
 
             personalNotif.setStatus(ENotificationStatus.DELETED);
             notificationRepository.save(personalNotif);
@@ -211,7 +213,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
         } else {
             // Gửi cho 1 user cụ thể
             User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
             notification = UserNotification.builder()
                     .title(request.getTitle())

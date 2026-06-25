@@ -26,7 +26,8 @@ import {
   IconX,
   IconRobot,
   IconUser,
-  IconSparkles,
+  IconArrowsMaximize,
+  IconArrowsMinimize,
   IconPaperclip,
   IconFile,
   IconPhoto,
@@ -58,6 +59,7 @@ export default function ChatBox() {
   const theme = useTheme();
 
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -269,7 +271,12 @@ export default function ChatBox() {
       id: Date.now(),
       type: 'user',
       content: trimmed,
-      attachments: ready.map((a) => ({ name: a.remote?.filename || a.name, mime: a.mime })),
+      attachments: ready.map((a) => ({
+        name: a.remote?.filename || a.name,
+        mime: a.mime,
+        kind: a.kind,
+        data: a.kind === 'image' ? a.data : undefined
+      })),
       timestamp: new Date()
     };
 
@@ -349,15 +356,20 @@ export default function ChatBox() {
             position: 'fixed',
             bottom: 96,
             right: 24,
-            width: { xs: 'calc(100vw - 32px)', sm: 400 },
-            height: { xs: 'calc(100vh - 140px)', sm: 540 },
-            maxHeight: '85vh',
+            width: expanded
+              ? { xs: 'calc(100vw - 32px)', sm: 'min(1600px, calc(100vw - 48px))' }
+              : { xs: 'calc(100vw - 32px)', sm: 400 },
+            height: expanded
+              ? { xs: 'calc(100vh - 108px)', sm: 'calc(100vh - 116px)' }
+              : { xs: 'calc(100vh - 140px)', sm: 540 },
+            maxHeight: '92vh',
             display: open ? 'flex' : 'none',
             flexDirection: 'column',
             borderRadius: 3,
             overflow: 'hidden',
             zIndex: 1300,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+            transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1), height 0.25s cubic-bezier(0.4,0,0.2,1)'
           }}
         >
           {/* Drag overlay */}
@@ -413,9 +425,13 @@ export default function ChatBox() {
                 {loading ? 'Đang nhập...' : 'Trực tuyến · Ctrl+Shift+S để đính kèm'}
               </Typography>
             </Box>
-            <Tooltip title="Cuộc hội thoại mới">
-              <IconButton size="small" sx={{ color: '#fff', '&:hover': { bgcolor: alpha('#fff', 0.15) } }} onClick={handleNewChat}>
-                <IconSparkles size={18} />
+            <Tooltip title={expanded ? 'Thu nhỏ' : 'Phóng to'}>
+              <IconButton
+                size="small"
+                sx={{ color: '#fff', '&:hover': { bgcolor: alpha('#fff', 0.15) } }}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? <IconArrowsMinimize size={18} /> : <IconArrowsMaximize size={18} />}
               </IconButton>
             </Tooltip>
             <IconButton size="small" sx={{ color: '#fff', '&:hover': { bgcolor: alpha('#fff', 0.15) } }} onClick={handleClose}>
@@ -498,7 +514,7 @@ export default function ChatBox() {
 
                 <Box
                   sx={{
-                    maxWidth: '78%',
+                    maxWidth: expanded ? '72%' : '78%',
                     px: 1.5,
                     py: 1,
                     borderRadius: 2,
@@ -517,8 +533,25 @@ export default function ChatBox() {
                 >
                   {/* Attachments inside user bubble */}
                   {msg.attachments?.length > 0 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: msg.content ? 0.75 : 0 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: msg.content ? 0.75 : 0 }}>
                       {msg.attachments.map((att, idx) => {
+                        if (att.kind === 'image' && att.data) {
+                          return (
+                            <Box
+                              key={idx}
+                              component="img"
+                              src={`data:${att.mime};base64,${att.data}`}
+                              alt={att.name}
+                              sx={{
+                                width: 80,
+                                height: 80,
+                                objectFit: 'cover',
+                                borderRadius: 1.5,
+                                border: `2px solid ${alpha('#fff', 0.4)}`
+                              }}
+                            />
+                          );
+                        }
                         const Icon = attachmentIcon(att.mime);
                         return (
                           <Box
@@ -637,6 +670,79 @@ export default function ChatBox() {
                   error: theme.palette.error.main
                 };
                 const c = colorMap[a.status];
+
+                // Image thumbnail preview
+                if (a.kind === 'image') {
+                  return (
+                    <Tooltip
+                      key={a.localId}
+                      title={
+                        a.status === 'error'
+                          ? a.error
+                          : a.status === 'uploading'
+                            ? 'Đang xử lý...'
+                            : `${shortName(a.name, 20)} · ${(a.size / 1024).toFixed(1)} KB`
+                      }
+                      arrow
+                    >
+                      <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                        {a.status === 'done' && a.data ? (
+                          <Box
+                            component="img"
+                            src={`data:${a.mime};base64,${a.data}`}
+                            alt={a.name}
+                            sx={{
+                              width: 56,
+                              height: 56,
+                              objectFit: 'cover',
+                              borderRadius: 1.5,
+                              display: 'block',
+                              border: `2px solid ${theme.palette.success.light}`
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: 56,
+                              height: 56,
+                              borderRadius: 1.5,
+                              bgcolor: theme.palette.grey[200],
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: `2px solid ${alpha(c, 0.4)}`
+                            }}
+                          >
+                            {a.status === 'uploading' ? (
+                              <CircularProgress size={20} sx={{ color: c }} />
+                            ) : (
+                              <Icon size={22} color={c} />
+                            )}
+                          </Box>
+                        )}
+                        <IconButton
+                          size="small"
+                          onClick={() => removeAttachment(a.localId)}
+                          sx={{
+                            position: 'absolute',
+                            top: -6,
+                            right: -6,
+                            width: 18,
+                            height: 18,
+                            bgcolor: theme.palette.grey[700],
+                            color: '#fff',
+                            p: 0,
+                            '&:hover': { bgcolor: theme.palette.error.main }
+                          }}
+                        >
+                          <IconX size={10} />
+                        </IconButton>
+                      </Box>
+                    </Tooltip>
+                  );
+                }
+
+                // Document chip (unchanged)
                 return (
                   <Tooltip
                     key={a.localId}

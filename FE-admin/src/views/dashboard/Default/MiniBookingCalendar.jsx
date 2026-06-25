@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, addDays, isSameMonth, isToday, parseISO } from 'date-fns';
+import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday, parseISO } from 'date-fns';
 
 // material-ui
 import Box from '@mui/material/Box';
@@ -52,17 +52,24 @@ export default function MiniBookingCalendar({ isLoading: propIsLoading }) {
 
   const { bookingsByDate, loading } = useBookingsByDateRange(monthRange.start, monthRange.end);
 
-  // Helper to build 4-week calendar weeks for any given month
+  // Build calendar weeks for a month: from Monday of week containing day-1
+  // to Sunday of week containing last day — so all days of the month are visible
   const getCalendarWeeksFor = (monthDate) => {
     const monthStart = startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });       // Sunday
+
     const days = [];
-    for (let i = 0; i < 28; i++) {
-      days.push(addDays(calendarStart, i));
+    let current = calendarStart;
+    while (current <= calendarEnd) {
+      days.push(current);
+      current = addDays(current, 1);
     }
+
     const weeks = [];
-    for (let i = 0; i < 4; i++) {
-      weeks.push(days.slice(i * 7, (i + 1) * 7));
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
     }
     return weeks;
   };
@@ -72,14 +79,11 @@ export default function MiniBookingCalendar({ isLoading: propIsLoading }) {
   const trackRef = useRef(null);
   const animatingRef = useRef(false);
 
-  // Get bookings for a specific date
+  // Get bookings for a specific date — only for days inside the current month
   const getBookingsForDate = (date) => {
+    if (!isSameMonth(date, currentMonth)) return { total: 0, bookings: [] };
     const dateStr = format(startOfDay(date), 'yyyy-MM-dd');
-    const dayData = bookingsByDate[dateStr] || {
-      total: 0,
-      bookings: []
-    };
-
+    const dayData = bookingsByDate[dateStr] || { total: 0, bookings: [] };
     return {
       total: dayData.total || 0,
       bookings: dayData.bookings || []

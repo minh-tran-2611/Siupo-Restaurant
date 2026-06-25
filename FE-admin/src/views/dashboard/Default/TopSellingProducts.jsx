@@ -95,7 +95,7 @@ export default function TopSellingProducts() {
 
             {/* Product Image */}
             <Avatar
-              src={product.imageUrl}
+              src={product.productImageUrl}
               variant="rounded"
               sx={{
                 width: 60,
@@ -112,11 +112,11 @@ export default function TopSellingProducts() {
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Sold: {product.quantitySold}
+                  Sold: {product.totalQuantitySold}
                 </Typography>
                 <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'divider' }} />
                 <Typography variant="caption" color="primary.main" fontWeight={600}>
-                  ${(product.revenue / 25000).toFixed(2)}
+                  ${product.totalRevenue?.toFixed(2)}
                 </Typography>
               </Stack>
             </Box>
@@ -124,7 +124,7 @@ export default function TopSellingProducts() {
             {/* Quantity Sold */}
             <Box sx={{ textAlign: 'right' }}>
               <Chip
-                label={`${product.quantitySold} sold`}
+                label={`${product.totalQuantitySold} sold`}
                 color={index < 3 ? 'primary' : 'default'}
                 size="small"
                 sx={{ fontWeight: 600 }}

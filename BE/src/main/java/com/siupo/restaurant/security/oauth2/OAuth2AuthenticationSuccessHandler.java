@@ -10,6 +10,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -25,9 +27,15 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final TokenService tokenService;
     private final UserRepository userRepository;
-    
+
     @Value("${oauth2.frontend.redirect-url}")
     private String frontendRedirectUrl;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshTokenExpiration;
+
+    @Value("${jwt.refresh-cookie-name}")
+    private String refreshTokenCookieName;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -50,10 +58,19 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // Generate tokens using TokenService (this saves refresh token to database)
         LoginResponse loginResponse = tokenService.generateAuthResponse(user);
 
-        // Redirect to frontend with tokens
+        // Set refresh token as HttpOnly cookie (same as email/password login)
+        ResponseCookie refreshCookie = ResponseCookie.from(refreshTokenCookieName, loginResponse.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Strict")
+                .maxAge(refreshTokenExpiration / 1000)
+                .path("/")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+
+        // Redirect to frontend with only accessToken (no refreshToken in URL)
         String targetUrl = UriComponentsBuilder.fromUriString(frontendRedirectUrl)
                 .queryParam("accessToken", loginResponse.getAccessToken())
-                .queryParam("refreshToken", loginResponse.getRefreshToken())
                 .queryParam("email", email)
                 .build()
                 .toUriString();

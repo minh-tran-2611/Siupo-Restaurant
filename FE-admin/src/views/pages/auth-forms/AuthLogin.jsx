@@ -53,7 +53,8 @@ export default function AuthLogin() {
         showSnackbar({ message: res.message || 'Login failed', severity: 'error' });
       }
     } catch (error) {
-      showSnackbar({ message: error?.message || 'Login failed', severity: 'error' });
+      const message = error?.response?.data?.message || error?.message || 'Login failed';
+      showSnackbar({ message, severity: 'error' });
     }
   };
 
