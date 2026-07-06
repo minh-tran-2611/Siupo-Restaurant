@@ -82,11 +82,8 @@ public class SecurityConfig {
                 "http://localhost:5173",
                 "http://localhost:3000",
                 // Production URLs
-                "https://siupo-frontend.vercel.app",
-                "https://siupo-frontend-admin.vercel.app",
-                // Cloud Run frontends (project mới)
-                "https://siupo-fe-customer-2twyqzvq7q-uc.a.run.app",
-                "https://siupo-fe-admin-2twyqzvq7q-uc.a.run.app"
+                "https://siupo-fe-customer-1036531815025.us-central1.run.app",
+                "https://siupo-fe-admin-1036531815025.us-central1.run.app"
         ));
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.List.of("*"));
