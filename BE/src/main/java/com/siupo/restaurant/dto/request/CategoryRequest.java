@@ -1,6 +1,5 @@
 package com.siupo.restaurant.dto.request;
 
-import com.siupo.restaurant.dto.ImageDTO;
 import lombok.Data;
 
 @Data

@@ -1,7 +1,5 @@
 package com.siupo.restaurant.dto.request;
 
-import com.siupo.restaurant.dto.AddressDTO;
-import com.siupo.restaurant.dto.CartItemDTO;
 import com.siupo.restaurant.enums.EPaymentMethod;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -18,11 +16,11 @@ import java.util.List;
 public class CreateOrderRequest {
 
     @NotNull(message = "Địa chỉ giao hàng không được để trống")
-    private AddressDTO shippingAddress;
+    private AddressRequest shippingAddress;
 
     private EPaymentMethod paymentMethod = EPaymentMethod.COD;
 
-    private List<CartItemDTO> items;
+    private List<CartItemRequest> items;
     
     private String voucherCode;
 }

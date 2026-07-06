@@ -47,7 +47,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new UnauthorizedException(ErrorCode.ACCOUNT_DISABLED);
         }
         LoginResponse response = tokenService.generateAuthResponse(user);
-        response.setUser(userMapper.toDto(user));
+        response.setUser(userMapper.toResponse(user));
         return response;
     }
 

@@ -1,6 +1,5 @@
 package com.siupo.restaurant.dto.response;
 
-import com.siupo.restaurant.dto.ReviewDTO;
 import com.siupo.restaurant.enums.EProductStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +16,7 @@ public class ProductResponse {
     private List<String> imageUrls;
     private Long categoryId;
     private String categoryName;
-    private List<ReviewDTO> reviews;
+    private List<ReviewResponse> reviews;
     private Double rating;
     private Integer reviewCount;
     private List<String> tags;

@@ -1,6 +1,5 @@
 package com.siupo.restaurant.dto.response;
 
-import com.siupo.restaurant.dto.ImageDTO;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,5 +10,5 @@ public class CategoryResponse {
     private String name;
     private String imageUrl;
     private String imageName;
-    private ImageDTO image;
+    private ImageResponse image;
 }

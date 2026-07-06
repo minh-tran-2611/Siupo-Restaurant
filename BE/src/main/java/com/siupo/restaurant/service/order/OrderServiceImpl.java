@@ -1,8 +1,6 @@
 package com.siupo.restaurant.service.order;
 
-import com.siupo.restaurant.dto.CartItemDTO;
-import com.siupo.restaurant.dto.OrderDTO;
-import com.siupo.restaurant.dto.OrderItemDTO;
+import com.siupo.restaurant.dto.request.CartItemRequest;
 import com.siupo.restaurant.dto.request.CreateOrderRequest;
 import com.siupo.restaurant.dto.response.*;
 import com.siupo.restaurant.enums.EOrderStatus;
@@ -57,22 +55,22 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Kiểm tra sản phẩm/combo request có trong cart
-        for (CartItemDTO item : request.getItems()) {
+        for (CartItemRequest item : request.getItems()) {
             CartItem ci = null;
             String itemName = "";
 
             // Tìm cart item tương ứng (product hoặc combo)
-            if (item.getProduct() != null && item.getProduct().getId() != null) {
+            if (item.getProductId() != null) {
                 ci = cartItems.stream()
-                        .filter(c -> c.getProduct() != null && c.getProduct().getId().equals(item.getProduct().getId()))
+                        .filter(c -> c.getProduct() != null && c.getProduct().getId().equals(item.getProductId()))
                         .findFirst()
                         .orElse(null);
                 if (ci != null) {
                     itemName = ci.getProduct().getName();
                 }
-            } else if (item.getCombo() != null && item.getCombo().getId() != null) {
+            } else if (item.getComboId() != null) {
                 ci = cartItems.stream()
-                        .filter(c -> c.getCombo() != null && c.getCombo().getId().equals(item.getCombo().getId()))
+                        .filter(c -> c.getCombo() != null && c.getCombo().getId().equals(item.getComboId()))
                         .findFirst()
                         .orElse(null);
                 if (ci != null) {
@@ -96,11 +94,21 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Khởi tạo đơn hàng
+        // Khởi tạo đơn hàng - convert AddressRequest to ShippingAddress
+        ShippingAddress shippingAddress = ShippingAddress.builder()
+                .address(request.getShippingAddress().getAddress())
+                .ward(request.getShippingAddress().getWard())
+                .district(request.getShippingAddress().getDistrict())
+                .province(request.getShippingAddress().getProvince())
+                .receiverName(request.getShippingAddress().getReceiverName())
+                .receiverPhone(request.getShippingAddress().getReceiverPhone())
+                .isDefault(request.getShippingAddress().getIsDefault())
+                .build();
+
         Order order = Order.builder()
                 .user(user)
                 .items(new ArrayList<>())
-                .shippingAddress(request.getShippingAddress())
+                .shippingAddress(shippingAddress)
                 .status(EOrderStatus.PENDING)
                 .build();
 
@@ -109,22 +117,22 @@ public class OrderServiceImpl implements OrderService {
         double subTotal = 0.0;
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (CartItemDTO item : request.getItems()) {
+        for (CartItemRequest item : request.getItems()) {
             CartItem cartItem = null;
             double price = 0.0;
 
             // Tìm cart item tương ứng (product hoặc combo)
-            if (item.getProduct() != null && item.getProduct().getId() != null) {
+            if (item.getProductId() != null) {
                 cartItem = cartItems.stream()
-                        .filter(ci -> ci.getProduct() != null && ci.getProduct().getId().equals(item.getProduct().getId()))
+                        .filter(ci -> ci.getProduct() != null && ci.getProduct().getId().equals(item.getProductId()))
                         .findFirst()
                         .orElse(null);
                 if (cartItem != null) {
                     price = cartItem.getProduct().getPrice();
                 }
-            } else if (item.getCombo() != null && item.getCombo().getId() != null) {
+            } else if (item.getComboId() != null) {
                 cartItem = cartItems.stream()
-                        .filter(ci -> ci.getCombo() != null && ci.getCombo().getId().equals(item.getCombo().getId()))
+                        .filter(ci -> ci.getCombo() != null && ci.getCombo().getId().equals(item.getComboId()))
                         .findFirst()
                         .orElse(null);
                 if (cartItem != null) {
@@ -226,15 +234,15 @@ public class OrderServiceImpl implements OrderService {
 
         // Xóa sản phẩm/combo trong cart
         List<Long> itemIdsToDelete = new ArrayList<>();
-        for (CartItemDTO item : request.getItems()) {
-            if (item.getProduct() != null && item.getProduct().getId() != null) {
+        for (CartItemRequest item : request.getItems()) {
+            if (item.getProductId() != null) {
                 cartItems.stream()
-                        .filter(ci -> ci.getProduct() != null && ci.getProduct().getId().equals(item.getProduct().getId()))
+                        .filter(ci -> ci.getProduct() != null && ci.getProduct().getId().equals(item.getProductId()))
                         .findFirst()
                         .ifPresent(ci -> itemIdsToDelete.add(ci.getId()));
-            } else if (item.getCombo() != null && item.getCombo().getId() != null) {
+            } else if (item.getComboId() != null) {
                 cartItems.stream()
-                        .filter(ci -> ci.getCombo() != null && ci.getCombo().getId().equals(item.getCombo().getId()))
+                        .filter(ci -> ci.getCombo() != null && ci.getCombo().getId().equals(item.getComboId()))
                         .findFirst()
                         .ifPresent(ci -> itemIdsToDelete.add(ci.getId()));
             }
@@ -282,7 +290,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentMethod(order.getPayment().getPaymentMethod())
                 .items(order.getItems()
                         .stream()
-                        .map(OrderItemDTO::toDTO)
+                        .map(this::toOrderItemResponse)
                         .toList()
                 )
                 .voucherCode(order.getVoucher() != null ? order.getVoucher().getCode() : null)
@@ -303,6 +311,50 @@ public class OrderServiceImpl implements OrderService {
         return responseBuilder.build();
     }
 
+    private OrderItemResponse toOrderItemResponse(OrderItem item) {
+        String productImageUrl = null;
+        String comboImageUrl = null;
+        String categoryName = null;
+
+        if (item.getProduct() != null) {
+            if (item.getProduct().getImages() != null && !item.getProduct().getImages().isEmpty()) {
+                productImageUrl = item.getProduct().getImages().get(0).getUrl();
+            }
+            if (item.getProduct().getCategory() != null) {
+                categoryName = item.getProduct().getCategory().getName();
+            }
+        }
+
+        if (item.getCombo() != null) {
+            if (item.getCombo().getImages() != null && !item.getCombo().getImages().isEmpty()) {
+                comboImageUrl = item.getCombo().getImages().get(0).getUrl();
+            }
+        }
+
+        ProductSimpleResponse productResponse = null;
+        if (item.getProduct() != null) {
+            productResponse = ProductSimpleResponse.builder()
+                    .id(item.getProduct().getId())
+                    .name(item.getProduct().getName())
+                    .price(item.getProduct().getPrice())
+                    .imageUrl(productImageUrl)
+                    .build();
+        }
+
+        return OrderItemResponse.builder()
+                .id(item.getId())
+                .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                .productName(item.getProduct() != null ? item.getProduct().getName() : null)
+                .quantity(item.getQuantity())
+                .price(item.getPrice())
+                .note(item.getNote())
+                .reviewed(item.getReviewed())
+                .subtotal(item.getPrice() != null && item.getQuantity() != null
+                        ? item.getPrice() * item.getQuantity() : null)
+                .product(productResponse)
+                .build();
+    }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -321,16 +373,16 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderDTO> getOrdersByUser(User user) {
+    public List<OrderResponse> getOrdersByUser(User user) {
         List<Order> orders = orderRepository.findByUserOrderByCreatedAtDesc(user);
         return orders.stream()
-                .map(OrderDTO::toDTO)
+                .map(this::toOrderResponse)
                 .toList();
     }
 
     @Override
     @Transactional
-    public OrderDTO cancelOrderByCustomer(Long id, User user) {
+    public OrderResponse cancelOrderByCustomer(Long id, User user) {
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.LOI_CHUA_DAT));
@@ -365,35 +417,35 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(EOrderStatus.CANCELED);
         orderRepository.save(order);
 
-        return OrderDTO.toDTO(order);
+        return toOrderResponse(order);
     }
 
     // ============== ADMIN METHODS ==============
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderDTO> getAllOrders(Pageable pageable, EOrderStatus status) {
+    public Page<OrderResponse> getAllOrders(Pageable pageable, EOrderStatus status) {
         Page<Order> orders;
         if (status != null) {
             orders = orderRepository.findByStatus(status, pageable);
         } else {
             orders = orderRepository.findAll(pageable);
         }
-        return orders.map(OrderDTO::toDTO);
+        return orders.map(this::toOrderResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public OrderDTO getOrderDetailById(Long id) {
+    public OrderResponse getOrderDetailById(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.LOI_CHUA_DAT));
 //                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
-        return OrderDTO.toDTO(order);
+        return toOrderResponse(order);
     }
 
     @Override
     @Transactional
-    public OrderDTO updateOrderStatus(Long id, EOrderStatus newStatus) {
+    public OrderResponse updateOrderStatus(Long id, EOrderStatus newStatus) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.LOI_CHUA_DAT));
 //                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
@@ -407,7 +459,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(newStatus);
         orderRepository.save(order);
 
-        return OrderDTO.toDTO(order);
+        return toOrderResponse(order);
     }
 
     @Override
@@ -425,6 +477,25 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.delete(order);
         return true;
+    }
+
+    private OrderResponse toOrderResponse(Order order) {
+        List<OrderItemResponse> itemResponses = order.getItems().stream()
+                .map(this::toOrderItemResponse)
+                .toList();
+
+        return OrderResponse.builder()
+                .orderId(order.getId())
+                .status(order.getStatus())
+                .totalPrice(order.getTotalPrice())
+                .shippingFee(order.getShippingFee())
+                .vat(order.getVat())
+                .paymentMethod(order.getPayment() != null
+                        ? order.getPayment().getPaymentMethod()
+                        : null)
+                .items(itemResponses)
+                .payment(order.getPayment())
+                .build();
     }
 
     private boolean isValidStatusTransition(EOrderStatus currentStatus, EOrderStatus newStatus) {

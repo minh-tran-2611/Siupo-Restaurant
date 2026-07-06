@@ -1,14 +1,15 @@
-package com.siupo.restaurant.dto;
+package com.siupo.restaurant.model;
 
+import jakarta.persistence.Embeddable;
 import lombok.*;
 
+@Embeddable
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode
-public class AddressDTO {
-    private Long id;
+public class ShippingAddress {
     private String address;
     private String ward;
     private String district;

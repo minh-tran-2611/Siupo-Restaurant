@@ -1,17 +1,18 @@
 package com.siupo.restaurant.dto.request;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class AddressUpdateRequest {
-    private Long addressId;
-    private AddressRequest updateAddress;
+public class CartItemRequest {
+    private Long id;
+    private Long productId;
+    private Long comboId;
+    private Double price;
+    private Long quantity;
 }

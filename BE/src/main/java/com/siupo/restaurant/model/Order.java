@@ -1,6 +1,5 @@
 package com.siupo.restaurant.model;
 
-import com.siupo.restaurant.dto.AddressDTO;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -29,10 +28,7 @@ public class Order {
     private Double totalPrice;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "id", column = @Column(insertable = false, updatable = false))
-    })
-    private AddressDTO shippingAddress;
+    private ShippingAddress shippingAddress;
 
     private Double shippingFee;
 

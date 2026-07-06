@@ -1,14 +1,14 @@
 package com.siupo.restaurant.mapper;
 
-import com.siupo.restaurant.dto.ImageDTO;
+import com.siupo.restaurant.dto.response.ImageResponse;
 import com.siupo.restaurant.model.Image;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ImageMapper {
-    public ImageDTO toDto(Image image) {
+    public ImageResponse toDto(Image image) {
         if (image == null) return null;
-        return ImageDTO.builder()
+        return ImageResponse.builder()
                 .id(image.getId())
                 .name(image.getName())
                 .url(image.getUrl())
