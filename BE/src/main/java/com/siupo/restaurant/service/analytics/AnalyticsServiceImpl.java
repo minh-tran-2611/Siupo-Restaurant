@@ -52,6 +52,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     @Cacheable(value = "analytics-revenue", key = "#request.period + '-' + #request.startDate + '-' + #request.endDate", unless = "#result == null")
     public RevenueAnalyticsResponse getRevenueAnalytics(AnalyticsRequest request) {
         DateRange range = getDateRange(request);
+        LocalDateTime now = LocalDateTime.now();
         
         // Calculate today's revenue
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
@@ -70,16 +71,16 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Double aov = orderRepository.calculateAverageOrderValue(EOrderStatus.COMPLETED, range.start, range.end);
         
         // Calculate week revenue
-        LocalDateTime weekStart = LocalDate.now().minusDays(7).atStartOfDay();
-        Double weekRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, weekStart, range.end);
+        LocalDateTime weekStart = now.minusDays(7);
+        Double weekRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, weekStart, now);
         
         // Calculate month revenue
         LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        Double monthRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, monthStart, range.end);
+        Double monthRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, monthStart, now);
         
         // Calculate year revenue
         LocalDateTime yearStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
-        Double yearRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, yearStart, range.end);
+        Double yearRevenue = orderRepository.calculateRevenue(EOrderStatus.COMPLETED, yearStart, now);
         
         // Calculate growth rate
         Double growthRate = calculateGrowthRate(todayRevenue, yesterdayRevenue);

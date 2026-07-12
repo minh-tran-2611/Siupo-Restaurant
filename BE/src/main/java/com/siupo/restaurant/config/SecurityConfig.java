@@ -6,6 +6,7 @@ import com.siupo.restaurant.security.oauth2.CustomOAuth2UserService;
 import com.siupo.restaurant.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.siupo.restaurant.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -32,6 +34,9 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
+
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,https://siupo-fe-customer-2twyqzvq7q-uc.a.run.app,https://siupo-fe-admin-2twyqzvq7q-uc.a.run.app,https://siupo-fe-customer-1036531815025.us-central1.run.app,https://siupo-fe-admin-1036531815025.us-central1.run.app}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -78,15 +83,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                // Production URLs
-                "https://siupo-fe-customer-1036531815025.us-central1.run.app",
-                "https://siupo-fe-admin-1036531815025.us-central1.run.app"
-        ));
-        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.List.of("*"));
+        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of( "Authorization","x-auth-token"));
         configuration.setAllowCredentials(true);
 

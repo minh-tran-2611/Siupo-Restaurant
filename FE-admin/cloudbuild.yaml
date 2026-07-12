@@ -5,6 +5,7 @@ substitutions:
   _REPO: siupo
   _TAG: latest
   _API_BASE_URL: https://siupo-be-2twyqzvq7q-uc.a.run.app/api
+  _AI_AGENT_BASE_URL: https://siupo-ai-service-2twyqzvq7q-uc.a.run.app/api
 
 steps:
   - id: build
@@ -15,6 +16,7 @@ steps:
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:${_TAG}
       - --build-arg=VITE_API_BASE_URL=${_API_BASE_URL}
+      - --build-arg=VITE_AI_AGENT_BASE_URL=${_AI_AGENT_BASE_URL}
       - .
 
   - id: push
