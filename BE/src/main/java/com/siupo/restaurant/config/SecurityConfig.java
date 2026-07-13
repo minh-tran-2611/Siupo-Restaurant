@@ -3,6 +3,7 @@ package com.siupo.restaurant.config;
 import com.siupo.restaurant.security.jwt.JwtAuthenticationEntryPoint;
 import com.siupo.restaurant.security.jwt.JwtAuthenticationFilter;
 import com.siupo.restaurant.security.oauth2.CustomOAuth2UserService;
+import com.siupo.restaurant.security.oauth2.CustomOidcUserService;
 import com.siupo.restaurant.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.siupo.restaurant.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final CustomOidcUserService customOidcUserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
 
@@ -70,6 +72,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
+                                .oidcUserService(customOidcUserService)
                         )
                         .successHandler(oAuth2AuthenticationSuccessHandler)
                         .failureHandler(oAuth2AuthenticationFailureHandler)
