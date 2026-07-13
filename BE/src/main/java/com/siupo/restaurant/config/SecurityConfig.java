@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -62,6 +63,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/vouchers/**").permitAll()
                         .requestMatchers("/api/page/**").permitAll()
                         .requestMatchers("/api/place-table-for-guest/**").permitAll()
+                        // MoMo calls this server-to-server without a user JWT.
+                        // The callback is authenticated by its HMAC signature.
+                        .requestMatchers(HttpMethod.POST, "/api/payment/momo/ipn").permitAll()
 
                         // Roles based access control
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
