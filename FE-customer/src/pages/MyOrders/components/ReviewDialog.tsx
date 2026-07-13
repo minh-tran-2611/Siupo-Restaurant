@@ -25,6 +25,7 @@ type ReviewDialogProps = {
 };
 
 const ReviewDialog: React.FC<ReviewDialogProps> = ({ open, onClose, orderId, item, productImage, onSubmit }) => {
+  const itemName = item.comboId ? item.comboName : item.productName;
   const [rating, setRating] = useState<number>(5);
   const [content, setContent] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -144,7 +145,7 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({ open, onClose, orderId, ite
             {productImage ? (
               <img
                 src={productImage}
-                alt={item.productName ?? undefined}
+                alt={itemName ?? undefined}
                 style={{
                   width: 80,
                   height: 80,
@@ -170,7 +171,7 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({ open, onClose, orderId, ite
             )}
             <Box>
               <Typography variant="body1" fontWeight={600} color="var(--color-gray1)">
-                {item.productName}
+                {itemName}
               </Typography>
               <Typography variant="body2" color="var(--color-gray3)" sx={{ mt: 0.5 }}>
                 Quantity: {item.quantity}

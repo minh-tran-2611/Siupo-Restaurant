@@ -34,14 +34,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product getProductEntityById(Long id) {
-        return productRepository.findById(id)
+        return productRepository.findActiveById(id)
                 .orElseThrow(() -> new BadRequestException(ErrorCode.PRODUCT_NOT_FOUND));
     }
 
     @Override
     public Page<ProductResponse> getAllProducts(User user, int page, int size, String sortBy) {
         Pageable pageable = PageableUtil.create(page, size, sortBy);
-        Page<Product> products = productRepository.findAll(pageable);
+        Page<Product> products = productRepository.findAllActive(pageable);
         return products.map(product -> productMapper.toResponse(product, user));
     }
 
@@ -68,35 +68,38 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        Specification<Product> spec = null;
+        Specification<Product> spec = (root, query, cb) -> cb.or(
+                cb.isNull(root.get("status")),
+                cb.notEqual(root.get("status"), EProductStatus.DELETED)
+        );
         if (name != null && !name.isEmpty()) {
-            spec = (root, query, cb) -> cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+            Specification<Product> nameSpec = (root, query, cb) ->
+                    cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+            spec = spec.and(nameSpec);
         }
         if (categoryIds != null && !categoryIds.isEmpty()) {
             Specification<Product> categorySpec = (root, query, cb) -> root.get("category").get("id").in(categoryIds);
-            spec = spec == null ? categorySpec : spec.and(categorySpec);
+            spec = spec.and(categorySpec);
         }
         if (tagIds != null && !tagIds.isEmpty()) {
             Specification<Product> tagSpec = (root, query, cb) -> {
                 query.distinct(true); // Tránh lặp sản phẩm khi join ManyToMany
                 return root.join("tags").get("id").in(tagIds);
             };
-            spec = spec == null ? tagSpec : spec.and(tagSpec);
+            spec = spec.and(tagSpec);
         }
         if (minPrice != null) {
             Specification<Product> minSpec = (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("price"), minPrice);
-            spec = spec == null ? minSpec : spec.and(minSpec);
+            spec = spec.and(minSpec);
         }
         if (maxPrice != null) {
             Specification<Product> maxSpec = (root, query, cb) -> cb.lessThanOrEqualTo(root.get("price"), maxPrice);
-            spec = spec == null ? maxSpec : spec.and(maxSpec);
+            spec = spec.and(maxSpec);
         }
 
         Pageable pageable = PageableUtil.create(page, size, sortBy);
 
-        Page<Product> productPage = (spec == null)
-                ? productRepository.findAll(pageable)
-                : productRepository.findAll(spec, pageable);
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
 
         return productPage.map(product -> {
             if (user instanceof Customer customer) {

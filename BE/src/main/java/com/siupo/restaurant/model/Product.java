@@ -19,7 +19,6 @@ import org.hibernate.annotations.Where;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Where(clause = "status != 'DELETED'")
 public class Product {
 
     @Id
@@ -41,6 +40,7 @@ public class Product {
     private List<ProductImage> images;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Where(clause = "hidden = false")
     private List<Review> reviews;
 
     @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})

@@ -25,6 +25,10 @@ public class Review {
 
     private Double rate;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean hidden = false;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -35,6 +39,10 @@ public class Review {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "combo_id")
+    private Combo combo;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_item_id")

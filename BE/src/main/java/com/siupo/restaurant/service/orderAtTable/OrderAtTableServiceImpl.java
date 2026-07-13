@@ -72,7 +72,7 @@ public class OrderAtTableServiceImpl implements OrderAtTableService {
 
         // Kiểm tra products
         Map<Long, Product> productMap = productIds.isEmpty() ? Map.of() : 
-                productRepository.findByIdIn(productIds).stream()
+                productRepository.findActiveByIdIn(productIds).stream()
                         .collect(Collectors.toMap(Product::getId, p -> p));
 
         if (productMap.size() != productIds.size()) {

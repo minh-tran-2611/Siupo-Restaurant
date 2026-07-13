@@ -1,6 +1,5 @@
 package com.siupo.restaurant.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,23 +9,25 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class ReviewResponse {
+public class AdminReviewResponse {
     private Long id;
+    private Long orderId;
     private Long orderItemId;
     private Long productId;
     private String productName;
     private Long comboId;
     private String comboName;
     private String itemType;
-    @JsonProperty("rating")
+    private Long userId;
+    private String userName;
+    private String userEmail;
     private Double rating;
     private String content;
     private List<String> imageUrls;
-    private String userName;
-    private Long userId;
+    private Boolean hidden;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

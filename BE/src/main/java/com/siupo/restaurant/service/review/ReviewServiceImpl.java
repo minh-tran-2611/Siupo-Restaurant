@@ -12,6 +12,7 @@ import com.siupo.restaurant.repository.OrderItemRepository;
 import com.siupo.restaurant.repository.OrderRepository;
 import com.siupo.restaurant.repository.ProductRepository;
 import com.siupo.restaurant.repository.ReviewRepository;
+import com.siupo.restaurant.repository.ComboRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final OrderItemRepository orderItemRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final ComboRepository comboRepository;
     private final ReviewMapper reviewMapper;
 
     @Override
@@ -56,6 +58,7 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = Review.builder()
                 .orderItem(orderItem)
                 .product(orderItem.getProduct())
+                .combo(orderItem.getCombo())
                 .user(user)
                 .rate(request.getRating().doubleValue())
                 .content(request.getContent())
@@ -124,12 +127,22 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional(readOnly = true)
     public List<ReviewResponse> getReviewsByProductId(Long productId) {
-        productRepository.findById(productId)
+        productRepository.findActiveById(productId)
                 .orElseThrow(() -> new BadRequestException(ErrorCode.PRODUCT_NOT_FOUND));
         // Get all reviews for this product
-        List<Review> reviews = reviewRepository.findByProductId(productId);
+        List<Review> reviews = reviewRepository.findPublishedByProductId(productId);
         // Map to response
         return reviews.stream()
+                .map(reviewMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> getReviewsByComboId(Long comboId) {
+        comboRepository.findById(comboId)
+                .orElseThrow(() -> new BadRequestException(ErrorCode.COMBO_NOT_FOUND));
+        return reviewRepository.findPublishedByComboId(comboId).stream()
                 .map(reviewMapper::toResponse)
                 .collect(Collectors.toList());
     }
