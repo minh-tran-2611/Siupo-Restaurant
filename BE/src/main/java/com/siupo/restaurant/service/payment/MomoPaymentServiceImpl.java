@@ -24,13 +24,18 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class MomoPaymentServiceImpl implements MomoPaymentService {
+
+    private static final Pattern MOMO_ORDER_ID_PATTERN = Pattern.compile("^ORDER_(\\d+)_\\d+$");
 
     private final MomoConfig momoConfig;
     private final OrderRepository orderRepository;
@@ -106,22 +111,38 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
             log.debug("MoMo Request Body: {}", requestBody);
 
             // Gửi request đến MoMo
-            HttpClient client = HttpClient.newHttpClient();
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(momoConfig.getEndpoint()))
                     .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(35))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String contentType = response.headers().firstValue("Content-Type").orElse("");
+            log.info("MoMo create-payment response status: {}, content-type: {}", response.statusCode(), contentType);
+
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.error("MoMo create-payment returned HTTP status {}", response.statusCode());
+                throw new BadRequestException(ErrorCode.PAYMENT_FAILED);
+            }
+
+            if (!contentType.toLowerCase().contains("application/json")) {
+                log.error("MoMo create-payment returned an unexpected content type: {}", contentType);
+                throw new BadRequestException(ErrorCode.PAYMENT_FAILED);
+            }
+
             log.debug("MoMo Response: {}", response.body());
 
             // Parse response
             MomoPaymentResponse momoResponse = objectMapper.readValue(response.body(), MomoPaymentResponse.class);
 
-            if (momoResponse.getResultCode() != 0) {
+            if (momoResponse.getResultCode() == null || momoResponse.getResultCode() != 0) {
                 log.error("MoMo payment creation failed: {} - {}", momoResponse.getResultCode(), momoResponse.getMessage());
-                throw new BadRequestException(ErrorCode.LOI_CHUA_DAT);
+                throw new BadRequestException(ErrorCode.PAYMENT_FAILED);
 //                throw new BadRequestException("Tạo thanh toán MoMo thất bại: " + momoResponse.getMessage());
             }
 
@@ -136,7 +157,10 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
 
         } catch (Exception e) {
             log.error("Error creating MoMo payment", e);
-            throw new BadRequestException(ErrorCode.LOI_CHUA_DAT);
+            if (e instanceof BadRequestException badRequestException) {
+                throw badRequestException;
+            }
+            throw new BadRequestException(ErrorCode.PAYMENT_FAILED);
 //            throw new BadRequestException("Lỗi khi tạo thanh toán MoMo: " + e.getMessage());
         }
     }
@@ -168,8 +192,7 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
             }
 
             // Tìm order
-            String orderIdStr = ipnRequest.getOrderId().replace("ORDER_", "");
-            Long orderId = Long.parseLong(orderIdStr);
+            Long orderId = extractOrderId(ipnRequest.getOrderId());
             Order order = orderRepository.findById(orderId)
                     .orElseThrow(() -> new BadRequestException(ErrorCode.LOI_CHUA_DAT));
 //                    .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn hàng"));
@@ -224,5 +247,18 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
     public boolean verifySignature(String rawData, String signature) {
         String expectedSignature = generateSignature(rawData);
         return expectedSignature.equalsIgnoreCase(signature);
+    }
+
+    static Long extractOrderId(String momoOrderId) {
+        if (momoOrderId == null) {
+            throw new IllegalArgumentException("MoMo orderId must not be null");
+        }
+
+        Matcher matcher = MOMO_ORDER_ID_PATTERN.matcher(momoOrderId);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("Invalid MoMo orderId format");
+        }
+
+        return Long.parseLong(matcher.group(1));
     }
 }

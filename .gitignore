@@ -64,6 +64,8 @@ yarn-error.log*
 # === Data & Test (already had) ===
 data/
 test/
+!BE/src/test/
+!BE/src/test/**
 
 # === Misc ===
 .cache/
