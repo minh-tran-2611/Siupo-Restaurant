@@ -3,7 +3,9 @@ package com.siupo.restaurant.controller;
 import com.siupo.restaurant.dto.request.CreateComboRequest;
 import com.siupo.restaurant.dto.response.ApiResponse;
 import com.siupo.restaurant.dto.response.ComboResponse;
+import com.siupo.restaurant.dto.response.ReviewResponse;
 import com.siupo.restaurant.service.combo.ComboService;
+import com.siupo.restaurant.service.review.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ComboController {
     private final ComboService comboService;
+    private final ReviewService reviewService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN')")
@@ -58,6 +61,16 @@ public class ComboController {
                 .data(combosResponse)
                 .build();
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<ApiResponse<List<ReviewResponse>>> getComboReviews(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.<List<ReviewResponse>>builder()
+                .success(true)
+                .code("200")
+                .message("Combo reviews retrieved successfully")
+                .data(reviewService.getReviewsByComboId(id))
+                .build());
     }
     
     @PutMapping("/{id}")

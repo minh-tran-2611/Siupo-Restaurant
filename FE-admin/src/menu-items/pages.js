@@ -7,6 +7,7 @@ import {
   IconPackage,
   IconPhoto,
   IconRobot,
+  IconStar,
   IconSettings,
   IconShoppingCart,
   IconTable,
@@ -29,7 +30,8 @@ const icons = {
   IconBell,
   IconTicket,
   IconTag,
-  IconRobot
+  IconRobot,
+  IconStar
 };
 
 // ==============================|| EXTRA PAGES MENU ITEMS ||============================== //
@@ -165,6 +167,20 @@ const pages = {
           title: 'Voucher Management',
           type: 'item',
           url: '/vouchers/management'
+        }
+      ]
+    },
+    {
+      id: 'reviews',
+      title: 'Reviews',
+      type: 'collapse',
+      icon: icons.IconStar,
+      children: [
+        {
+          id: 'review-management',
+          title: 'Review Management',
+          type: 'item',
+          url: '/reviews/management'
         }
       ]
     },

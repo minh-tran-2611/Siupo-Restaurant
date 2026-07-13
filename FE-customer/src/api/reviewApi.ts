@@ -16,6 +16,9 @@ const reviewApi = {
   getProductReviews: (productId: number): Promise<ApiResponse<ReviewResponse[]>> =>
     axiosClient.get(`/products/${productId}/reviews`).then((response) => response.data),
 
+  getComboReviews: (comboId: number): Promise<ApiResponse<ReviewResponse[]>> =>
+    axiosClient.get(`/combos/${comboId}/reviews`).then((response) => response.data),
+
   getReviewsByOrderId: (orderId: number): Promise<ApiResponse<OrderReviewsResponse>> =>
     axiosClient.get(`/orders/${orderId}/reviews`).then((response) => response.data),
 

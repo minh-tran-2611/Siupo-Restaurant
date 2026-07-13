@@ -22,6 +22,11 @@ const reviewService = {
     return res;
   },
 
+  getComboReviews: async (comboId: number) => {
+    const res = await reviewApi.getComboReviews(comboId);
+    return res;
+  },
+
   getReviewsByOrderId: async (orderId: number) => {
     const res = await reviewApi.getReviewsByOrderId(orderId);
     return res;

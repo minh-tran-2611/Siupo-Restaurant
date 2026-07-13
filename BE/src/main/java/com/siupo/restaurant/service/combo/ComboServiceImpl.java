@@ -46,7 +46,7 @@ public class ComboServiceImpl implements ComboService {
             List<Long> productIds = request.getItems().stream()
                     .map(ComboItemRequest::getProductId)
                     .collect(Collectors.toList());
-            List<Product> products = productRepository.findAllById(productIds);
+            List<Product> products = productRepository.findActiveByIdIn(productIds);
             if (products.size() != productIds.stream().distinct().count()) {
                 throw new ResourceNotFoundException(ErrorCode.PRODUCT_NOT_FOUND);
             }
@@ -127,7 +127,7 @@ public class ComboServiceImpl implements ComboService {
                     .map(ComboItemRequest::getProductId)
                     .collect(Collectors.toList());
             // 4.2 Query 1 lần lấy hết Product
-            List<Product> products = productRepository.findAllById(productIds);
+            List<Product> products = productRepository.findActiveByIdIn(productIds);
             // Validate: Nếu thiếu product nào đó
             if (products.size() != productIds.stream().distinct().count()) {
                 throw new ResourceNotFoundException(ErrorCode.PRODUCT_NOT_FOUND);

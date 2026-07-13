@@ -3,6 +3,8 @@ package com.siupo.restaurant.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -21,10 +23,12 @@ public class OrderItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "combo_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Combo combo;
 
     private Long quantity;

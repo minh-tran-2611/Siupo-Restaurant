@@ -49,7 +49,7 @@ public class PageServiceImpl implements PageService {
 
     private List<ProductResponse> getLatestProducts(int limit) {
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "id"));
-        List<Product> products = productRepository.findAll(pageable).getContent();
+        List<Product> products = productRepository.findAllActive(pageable).getContent();
         return products.stream()
                 .map(productMapper::toResponse)
                 .toList();
@@ -57,7 +57,7 @@ public class PageServiceImpl implements PageService {
 
     private List<ProductResponse> getInitialProducts(int limit) {
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.ASC, "id"));
-        List<Product> products = productRepository.findAll(pageable).getContent();
+        List<Product> products = productRepository.findAllActive(pageable).getContent();
         return products.stream()
                 .map(productMapper::toResponse)
                 .toList();

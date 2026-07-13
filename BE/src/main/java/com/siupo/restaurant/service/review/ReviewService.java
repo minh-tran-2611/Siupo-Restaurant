@@ -12,4 +12,5 @@ public interface ReviewService {
     ReviewResponse getReviewByOrderItemId(Long orderItemId, User user);
     OrderReviewsResponse getReviewsByOrderId(Long orderId, User user);
     List<ReviewResponse> getReviewsByProductId(Long productId);
+    List<ReviewResponse> getReviewsByComboId(Long comboId);
 }

@@ -86,7 +86,7 @@ public class PlaceTableForCustomerServiceImpl implements PlaceTableForCustomerSe
         // Nếu có chọn món trước
         if (request.getPreOrderItems() != null && !request.getPreOrderItems().isEmpty()) {
             for (PreOrderItemRequest preOrderItem : request.getPreOrderItems()) {
-                Product product = productRepository.findById(preOrderItem.getProductId())
+                Product product = productRepository.findActiveById(preOrderItem.getProductId())
                         .orElseThrow(() -> new BadRequestException(ErrorCode.LOI_CHUA_DAT));
 //                        .orElseThrow(() -> new ResourceNotFoundException(
 //                                "Không tìm thấy sản phẩm với ID: " + preOrderItem.getProductId()));

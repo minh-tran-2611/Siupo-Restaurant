@@ -4,7 +4,7 @@ const orderApi = {
   // Get all orders with pagination and optional status filter
   getOrders: (opts = {}) => {
     const { page = 0, size = 10, sortBy = 'createdAt,desc', status } = opts;
-    const params = { page, size, sort: sortBy.split(',') };
+    const params = { page, size, sort: sortBy };
     if (status) params.status = status;
     return axiosClient.get('/orders/admin', { params }).then((res) => res.data);
   },

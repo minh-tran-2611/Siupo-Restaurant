@@ -14,6 +14,7 @@ type ViewReviewDialogProps = {
 };
 
 const ViewReviewDialog: React.FC<ViewReviewDialogProps> = ({ open, onClose, orderId, item, productImage, review }) => {
+  const itemName = item.comboId ? item.comboName : item.productName;
   return (
     <Dialog
       open={open}
@@ -57,7 +58,7 @@ const ViewReviewDialog: React.FC<ViewReviewDialogProps> = ({ open, onClose, orde
             {productImage ? (
               <img
                 src={productImage}
-                alt={item.productName ?? undefined}
+                alt={itemName ?? undefined}
                 style={{
                   width: 80,
                   height: 80,
@@ -83,7 +84,7 @@ const ViewReviewDialog: React.FC<ViewReviewDialogProps> = ({ open, onClose, orde
             )}
             <Box>
               <Typography variant="body1" fontWeight={600} color="var(--color-gray1)">
-                {item.productName}
+                {itemName}
               </Typography>
               <Typography variant="body2" color="var(--color-gray3)" sx={{ mt: 0.5 }}>
                 Quantity: {item.quantity}

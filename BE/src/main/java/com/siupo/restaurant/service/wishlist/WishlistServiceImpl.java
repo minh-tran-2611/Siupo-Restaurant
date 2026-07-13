@@ -36,7 +36,7 @@ public class WishlistServiceImpl implements WishlistService {
     public WishlistResponse addToWishlist(User user, Long productId) {
         Wishlist wishlist = wishlistRepository.findByUser(user)
                 .orElseGet(() -> createWishlistForUser(user));
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findActiveById(productId)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.PRODUCT_NOT_FOUND));
         if (wishlistItemRepository.existsByWishlistIdAndProductId(wishlist.getId(), productId)) {
             throw new ConflictException(ErrorCode.WISHLIST_CONFLICT);
@@ -50,7 +50,7 @@ public class WishlistServiceImpl implements WishlistService {
     public WishlistResponse removeFromWishlist(User user, Long productId) {
         Wishlist wishlist = wishlistRepository.findByUser(user)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.WISHLIST_NOT_FOUND));
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findActiveById(productId)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.PRODUCT_NOT_FOUND));
         if (!wishlistItemRepository.existsByWishlistIdAndProductId(wishlist.getId(), productId)) {
             throw new NotFoundException(ErrorCode.WISHLIST_ITEM_NOT_FOUND);
